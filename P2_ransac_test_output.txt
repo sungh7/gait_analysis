@@ -1,0 +1,230 @@
+Testing P2 Cadence Methods on S1_01
+================================================================================
+Loaded 1641 frames from 1-2_side_pose_fps30.csv
+Calculated angles for 1641 frames
+  Fusion detection: 63 raw peaks → 63 validated heel strikes
+  Fusion detection: 63 raw peaks → 63 validated heel strikes
+Detected strikes: Left=63, Right=63
+
+Ground Truth Cadence: Left=115.4, Right=114.8, Avg=115.1 steps/min
+
+--------------------------------------------------------------------------------
+METHOD 1: RANSAC
+--------------------------------------------------------------------------------
+Left:  112.5 steps/min (inliers: 33/39, 84.6%)
+Right: 112.5 steps/min (inliers: 32/42, 76.2%)
+Avg:   112.5 steps/min
+Error: -2.6 steps/min (-2.3%)
+
+--------------------------------------------------------------------------------
+METHOD 2: PERCENTILE (Baseline)
+--------------------------------------------------------------------------------
+Left:  109.1 steps/min
+Right: 112.5 steps/min
+Avg:   110.8 steps/min
+Error: -4.3 steps/min (-3.7%)
+
+================================================================================
+COMPARISON
+================================================================================
+RANSAC Error:     2.6 steps/min
+Percentile Error: 4.3 steps/min
+Improvement:      +1.7 steps/min (+39.6%)
+✅ RANSAC is better
+
+
+================================================================================
+TESTING ON MULTIPLE SUBJECTS
+================================================================================
+
+Testing P2 Cadence Methods on S1_01
+================================================================================
+Loaded 1641 frames from 1-2_side_pose_fps30.csv
+Calculated angles for 1641 frames
+  Fusion detection: 63 raw peaks → 63 validated heel strikes
+  Fusion detection: 63 raw peaks → 63 validated heel strikes
+Detected strikes: Left=63, Right=63
+
+Ground Truth Cadence: Left=115.4, Right=114.8, Avg=115.1 steps/min
+
+--------------------------------------------------------------------------------
+METHOD 1: RANSAC
+--------------------------------------------------------------------------------
+Left:  112.5 steps/min (inliers: 33/39, 84.6%)
+Right: 112.5 steps/min (inliers: 32/42, 76.2%)
+Avg:   112.5 steps/min
+Error: -2.6 steps/min (-2.3%)
+
+--------------------------------------------------------------------------------
+METHOD 2: PERCENTILE (Baseline)
+--------------------------------------------------------------------------------
+Left:  109.1 steps/min
+Right: 112.5 steps/min
+Avg:   110.8 steps/min
+Error: -4.3 steps/min (-3.7%)
+
+================================================================================
+COMPARISON
+================================================================================
+RANSAC Error:     2.6 steps/min
+Percentile Error: 4.3 steps/min
+Improvement:      +1.7 steps/min (+39.6%)
+✅ RANSAC is better
+
+
+Testing P2 Cadence Methods on S1_02
+================================================================================
+Loaded 1156 frames from 2-2_side_pose_fps30.csv
+Calculated angles for 1156 frames
+  Fusion detection: 45 raw peaks → 45 validated heel strikes
+  Fusion detection: 41 raw peaks → 41 validated heel strikes
+Detected strikes: Left=45, Right=41
+
+Ground Truth Cadence: Left=113.7, Right=113.2, Avg=113.4 steps/min
+
+--------------------------------------------------------------------------------
+METHOD 1: RANSAC
+--------------------------------------------------------------------------------
+Left:  144.0 steps/min (inliers: 25/34, 73.5%)
+Right: 171.4 steps/min (inliers: 21/32, 65.6%)
+Avg:   157.7 steps/min
+Error: +44.3 steps/min (+39.0%)
+
+--------------------------------------------------------------------------------
+METHOD 2: PERCENTILE (Baseline)
+--------------------------------------------------------------------------------
+Left:  128.6 steps/min
+Right: 164.4 steps/min
+Avg:   146.5 steps/min
+Error: +33.0 steps/min (+29.1%)
+
+================================================================================
+COMPARISON
+================================================================================
+RANSAC Error:     44.3 steps/min
+Percentile Error: 33.0 steps/min
+Improvement:      -11.2 steps/min (-34.0%)
+❌ Percentile is better
+
+
+Testing P2 Cadence Methods on S1_03
+================================================================================
+Loaded 1520 frames from 3-2_side_pose_fps30.csv
+Calculated angles for 1520 frames
+  Fusion detection: 63 raw peaks → 63 validated heel strikes
+  Fusion detection: 50 raw peaks → 49 validated heel strikes
+Detected strikes: Left=63, Right=49
+
+Ground Truth Cadence: Left=113.7, Right=113.2, Avg=113.4 steps/min
+
+--------------------------------------------------------------------------------
+METHOD 1: RANSAC
+--------------------------------------------------------------------------------
+Left:  122.0 steps/min (inliers: 40/45, 88.9%)
+Right: 102.9 steps/min (inliers: 27/38, 71.1%)
+Avg:   112.4 steps/min
+Error: -1.0 steps/min (-0.9%)
+
+--------------------------------------------------------------------------------
+METHOD 2: PERCENTILE (Baseline)
+--------------------------------------------------------------------------------
+Left:  116.1 steps/min
+Right: 93.8 steps/min
+Avg:   104.9 steps/min
+Error: -8.5 steps/min (-7.5%)
+
+================================================================================
+COMPARISON
+================================================================================
+RANSAC Error:     1.0 steps/min
+Percentile Error: 8.5 steps/min
+Improvement:      +7.5 steps/min (+88.4%)
+✅ RANSAC is better
+
+
+Testing P2 Cadence Methods on S1_08
+================================================================================
+Loaded 1715 frames from 8-2_side_pose_fps23.csv
+Calculated angles for 1715 frames
+  Fusion detection: 61 raw peaks → 61 validated heel strikes
+  Fusion detection: 56 raw peaks → 56 validated heel strikes
+Detected strikes: Left=61, Right=56
+
+Ground Truth Cadence: Left=100.6, Right=100.3, Avg=100.5 steps/min
+
+--------------------------------------------------------------------------------
+METHOD 1: RANSAC
+--------------------------------------------------------------------------------
+Left:  116.1 steps/min (inliers: 48/54, 88.9%)
+Right: 116.1 steps/min (inliers: 39/48, 81.2%)
+Avg:   116.1 steps/min
+Error: +15.7 steps/min (+15.6%)
+
+--------------------------------------------------------------------------------
+METHOD 2: PERCENTILE (Baseline)
+--------------------------------------------------------------------------------
+Left:  112.5 steps/min
+Right: 109.1 steps/min
+Avg:   110.8 steps/min
+Error: +10.3 steps/min (+10.3%)
+
+================================================================================
+COMPARISON
+================================================================================
+RANSAC Error:     15.7 steps/min
+Percentile Error: 10.3 steps/min
+Improvement:      -5.3 steps/min (-51.7%)
+❌ Percentile is better
+
+
+Testing P2 Cadence Methods on S1_09
+================================================================================
+Loaded 1560 frames from 9-2_side_pose_fps24.csv
+Calculated angles for 1560 frames
+  Fusion detection: 53 raw peaks → 53 validated heel strikes
+  Fusion detection: 57 raw peaks → 57 validated heel strikes
+Detected strikes: Left=53, Right=57
+
+Ground Truth Cadence: Left=109.3, Right=109.6, Avg=109.4 steps/min
+
+--------------------------------------------------------------------------------
+METHOD 1: RANSAC
+--------------------------------------------------------------------------------
+Left:  124.1 steps/min (inliers: 41/45, 91.1%)
+Right: 128.6 steps/min (inliers: 43/47, 91.5%)
+Avg:   126.4 steps/min
+Error: +16.9 steps/min (+15.5%)
+
+--------------------------------------------------------------------------------
+METHOD 2: PERCENTILE (Baseline)
+--------------------------------------------------------------------------------
+Left:  112.5 steps/min
+Right: 120.0 steps/min
+Avg:   116.2 steps/min
+Error: +6.8 steps/min (+6.2%)
+
+================================================================================
+COMPARISON
+================================================================================
+RANSAC Error:     16.9 steps/min
+Percentile Error: 6.8 steps/min
+Improvement:      -10.1 steps/min (-148.4%)
+❌ Percentile is better
+
+
+================================================================================
+SUMMARY (n=5)
+================================================================================
+
+Subject            GT     RANSAC Percentile  Improvement
+------------------------------------------------------------
+S1_01           115.1      112.5      110.8         +1.7
+S1_02           113.4      157.7      146.5        -11.2
+S1_03           113.4      112.4      104.9         +7.5
+S1_08           100.5      116.1      110.8         -5.3
+S1_09           109.4      126.4      116.2        -10.1
+------------------------------------------------------------
+Mean Error                  16.1       12.6         -3.5
+
+Paired t-test: t=-0.978, p=0.383410 n.s.
+✓ Results saved to P2_ransac_test_results.json

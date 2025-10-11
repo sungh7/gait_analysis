@@ -1,0 +1,58 @@
+{
+  "test_date": "2025-10-10",
+  "n_subjects": 5,
+  "results": [
+    {
+      "subject_id": "S1_01",
+      "gt_cadence_avg": 115.1025,
+      "ransac_avg": 112.5,
+      "pct_avg": 110.79545454545453,
+      "ransac_error": -2.6025000000000063,
+      "pct_error": -4.307045454545474,
+      "improvement": 1.7045454545454675
+    },
+    {
+      "subject_id": "S1_02",
+      "gt_cadence_avg": 113.43199999999999,
+      "ransac_avg": 157.71428571428572,
+      "pct_avg": 146.47749510763214,
+      "ransac_error": 44.282285714285734,
+      "pct_error": 33.04549510763215,
+      "improvement": -11.236790606653585
+    },
+    {
+      "subject_id": "S1_03",
+      "gt_cadence_avg": 113.43199999999999,
+      "ransac_avg": 112.44552058111378,
+      "pct_avg": 104.93951612903226,
+      "ransac_error": -0.9864794188862049,
+      "pct_error": -8.492483870967732,
+      "improvement": 7.506004452081527
+    },
+    {
+      "subject_id": "S1_08",
+      "gt_cadence_avg": 100.47749999999999,
+      "ransac_avg": 116.1290322580645,
+      "pct_avg": 110.79545454545453,
+      "ransac_error": 15.651532258064506,
+      "pct_error": 10.31795454545454,
+      "improvement": -5.333577712609966
+    },
+    {
+      "subject_id": "S1_09",
+      "gt_cadence_avg": 109.44200000000001,
+      "ransac_avg": 126.35467980295566,
+      "pct_avg": 116.25,
+      "ransac_error": 16.91267980295565,
+      "pct_error": 6.807999999999993,
+      "improvement": -10.104679802955658
+    }
+  ],
+  "summary": {
+    "ransac_mae": 16.08709543883842,
+    "percentile_mae": 12.594195795719978,
+    "mean_improvement": -3.492899643118443,
+    "t_statistic": -0.9780907596744721,
+    "p_value": 0.38341048721234144
+  }
+}

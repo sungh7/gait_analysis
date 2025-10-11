@@ -1,0 +1,39 @@
+.DS_Store
+.env
+*.pyc
+__pycache__/
+.ipynb_checkpoints/
+.vscode/
+*.log
+
+# Large binary artifacts
+*.mp4
+*.mov
+*.avi
+*.gif
+*.jpg
+*.jpeg
+*.png
+*.mat
+*.zip
+
+# Environment and temp directories
+.conda/
+temp/
+test_images/
+jupyter-notify/
+
+# Generated data outputs
+data/
+processed/
+processed_new/
+results/
+validation_results/
+batch_results/
+mp_result/
+realtime_gait_system/
+ground_truth_formatted/
+visualization_results/
+organized_project/
+gavd_real_models_*/
+
