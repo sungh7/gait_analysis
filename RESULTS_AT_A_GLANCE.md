@@ -112,22 +112,23 @@ DTW 템플릿 매칭으로 75% 개선 → 목표 달성
 
 **교훈:** 개인화(personalization)가 핵심
 
-### 3. 오염 데이터는 복구 불가
+### 3. 깨끗한 스트라이크 → RANSAC 재가동
 ```
-P2 RANSAC 시도 #1: 3.45× 데이터 → 실패
-P2 RANSAC 시도 #2: 필터링 적용 → 더 악화
+RANSAC (V3 데이터)  : MAE 16.1 steps/min
+RANSAC (V5 데이터)  : MAE  8.7 steps/min
+Percentile (V5)     : MAE 17.7 steps/min
 ```
 
-**교훈:** 상류(upstream) 수정이 필수
+**교훈:** 템플릿 기반 스트라이크 + RANSAC 조합으로 21명 전체에서 46% 오차 축소
 
 ---
 
 ## 🚀 다음 단계
 
 ### 즉시 가능 (1-2일)
-1. ✅ **P2 재시도** - 깨끗한 0.93× 데이터로 보행속도 추정
-2. ✅ **전체 평가** - 21명 전체 코호트에서 V5 성능 측정
-3. ✅ **오차 분석** - 잔여 30.2cm 오차의 근본 원인 규명
+1. ✅ **P2 재시도** - 템플릿+RANSAC 파이프라인으로 21명 전원 처리
+2. ✅ **전체 평가** - V5 + RANSAC 성능 리포트 (`P2_ransac_v5_results.json`)
+3. ⏳ **오차 분석** - 잔여 30.2 cm 공간 오차의 병렬 원인 규명 (Cadence 개선 반영 필요)
 
 ### 단기 (1주)
 4. **임상 검증** - 병리적 보행 패턴 테스트
@@ -145,10 +146,13 @@ P2 RANSAC 시도 #2: 필터링 적용 → 더 악화
 
 ### 코드
 - `tiered_evaluation_v5.py` - 최종 파이프라인 (P1+P3B)
+- `P2_cadence_v5.py` - 템플릿 정합 + RANSAC 재시도 스크립트
 - `P3B_template_based_detector.py` - DTW 템플릿 검출기
-- `compare_v4_v5.py` - 성능 비교 스크립트
+- `compare_v4_v5.py` - V4/V5 성능 비교 스크립트
 
 ### 결과
+- `P2_ransac_v5_results.json` - 21명 보행속도 추정 리포트
+- `P2_ransac_v5_diagnostics.csv` - P2 세부 진단
 - `V4_V5_comparison.json` - 상세 비교 데이터
 - `P3B_template_results.json` - P3B 전체 결과
 - `tiered_evaluation_report_v4.json` - V4 전체 보고서
@@ -166,13 +170,13 @@ P2 RANSAC 시도 #2: 필터링 적용 → 더 악화
 |------|------|
 | P0: 기준선 진단 | ✅ 100% |
 | P1: 보폭 스케일링 | ✅ 100% |
-| P2: 보행속도 추정 | ⏸️ 차단 (재시도 예정) |
+| P2: 보행속도 추정 | ✅ 100% (RANSAC MAE 8.7 steps/min) |
 | P3A: 파라미터 최적화 | ⚠️ 23% (부분 성공) |
 | P3B: 템플릿 검출 | ✅ 100% (목표 달성!) |
 | V5: 파이프라인 통합 | ✅ 100% (배포 완료) |
 | 문서화 | ✅ 100% |
 
-**전체 진행률: 85%** (P2 제외)
+**전체 진행률: 92%** (P3A 미세 튜닝 제외)
 
 ---
 

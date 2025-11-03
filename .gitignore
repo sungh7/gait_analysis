@@ -37,3 +37,14 @@ visualization_results/
 organized_project/
 gavd_real_models_*/
 
+# Keep organized structure - do not ignore
+!core/
+!experiments/
+!docs/
+
+# Experimental outputs
+experiments/*.json
+experiments/*.csv
+experiments/*.txt
+experiments/*.log
+

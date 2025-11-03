@@ -595,15 +595,44 @@ def estimate_cadence_ransac(heel_strikes, fps, min_interval=0.6):
 
 **Decision:** Reverse phase order to **P3 → P2**. Address root cause (detector sensitivity) before attempting cadence refinement.
 
-### 5.5 Revised Timeline
+### 5.5 Recovery Timeline (Updated 2025-10-11)
 
-**Status:** BLOCKED (awaiting P3 completion)
-**Estimated Duration:** 2-3 days (after P3)
-**Dependencies:** Phase 3 achieves target strike ratio ≤1.2×
+**Status:** ✅ UNBLOCKED (P3B template detector delivered 0.93× strike ratio)
+**Actual Duration:** 1.5 days (after P3B rollout)
+**Executed Plan:**
+- Integrate template-matched strikes into RANSAC pipeline
+- Recompute subject-specific stride windows from fusion median intervals
+- Full cohort evaluation (n=21) with automated logging
+
+### 5.6 Template-Guided RANSAC (2025-10-11)
+
+**Implementation:** `P2_cadence_v5.py`
+- Generates subject templates via `create_reference_template`, but rescales stride counts using fusion median interval
+- Template hits act as gating windows; precise timestamps snap to fusion strikes (`_refine_with_fusion`)
+- Dual-output diagnostics (`P2_ransac_v5_results.json`, `P2_ransac_v5_diagnostics.csv`)
+
+**Key Enhancements:**
+1. **Adaptive stride windowing:** Median fusion interval replaces static GT stride counts → window length matches actual cadence.
+2. **Template + fusion ensemble:** Template similarity filters false positives; fusion provides sharp timing.
+3. **Per-subject fallbacks:** Automatic reversion to fusion-only when template creation fails (<fps valid samples).
+
+**Aggregate Results (n=21):**
+
+| Metric | Percentile (V5 Strikes) | RANSAC (Template-Guided) |
+|--------|-------------------------|--------------------------|
+| MAE (steps/min) | 17.74 | **8.67** |
+| Mean Bias (steps/min) | -16.50 | **-6.48** |
+| Subjects ≤10 steps/min error | 2 / 21 | **14 / 21** |
+
+**Observations:**
+- Cadence accuracy recovered once strike corruption removed (median improvement +9.1 steps/min per subject vs percentile baseline; prior RANSAC attempt on V3 strikes delivered MAE 16.1 /min on 5-subject set).
+- Residual outliers (S1_08, S1_09) correspond to turn-heavy sequences; earmarked for spatial error analysis.
+- Processing time ≈ 9 s/subject (FastDTW dominates; acceptable for offline batch).
+
 **Deliverables:**
-- Cadence module integrated into V5 pipeline
-- `supplementary/experiments/P2_failed_attempts.md` (archived)
-- Updated RESEARCH_LOG.md Section 5
+- `P2_cadence_v5.py` (code), `P2_ransac_v5_results.json`, `P2_ransac_v5_diagnostics.csv`
+- Section 5 (this log) updated with final metrics
+- Immediate next step shifted to spatial error root-cause analysis (Section 4 follow-up)
 
 ---
 
@@ -1669,4 +1698,3 @@ $$\text{Residual}_{\text{full}} = 29.1 \text{ cm} > 21.7 \text{ cm} = \text{Resi
 **Next Session:**
 - Begin Phase 2: RANSAC cadence estimator
 - Target: Cadence ICC ≥ 0.30, RMSE < 15 /min
-

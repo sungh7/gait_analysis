@@ -174,7 +174,8 @@ def calculate_stride_based_scale_factor(
     hip_trajectory: np.ndarray,
     heel_strikes: List[int],
     gt_stride_length_cm: float,
-    min_strikes: int = 3
+    min_strikes: int = 3,
+    use_quality_weighting: bool = False
 ) -> Tuple[float, dict]:
     """
     Calculate subject-specific scale factor using GT stride length (Phase 1 method).
@@ -184,6 +185,7 @@ def calculate_stride_based_scale_factor(
         heel_strikes: List of heel strike frame indices
         gt_stride_length_cm: Ground truth stride length in cm
         min_strikes: Minimum number of strikes needed
+        use_quality_weighting: If True, use V5.2 quality-weighted method
 
     Returns:
         scale_factor: Multiplier to convert MediaPipe coords to meters
@@ -211,10 +213,76 @@ def calculate_stride_based_scale_factor(
     if not stride_distances_mp:
         return 1.0, {'error': 'no_valid_strides'}
 
-    # Robust estimator (median)
-    median_stride_mp = float(np.median(stride_distances_mp))
-    mean_stride_mp = float(np.mean(stride_distances_mp))
-    std_stride_mp = float(np.std(stride_distances_mp))
+    stride_arr = np.array(stride_distances_mp)
+
+    # V5.2: Quality-weighted method
+    if use_quality_weighting and len(stride_arr) >= 5:
+        # Step 1: Stride-level outlier rejection using MAD
+        median_val = np.median(stride_arr)
+        mad = np.median(np.abs(stride_arr - median_val))
+
+        if mad > 0:
+            modified_z = 0.6745 * (stride_arr - median_val) / mad
+            inlier_mask = np.abs(modified_z) < 3.5
+            strides_clean = stride_arr[inlier_mask]
+        else:
+            strides_clean = stride_arr
+
+        if len(strides_clean) < 3:
+            strides_clean = stride_arr  # Fallback if too many rejected
+
+        # Step 2: Calculate per-stride quality (inverse CV of local neighborhood)
+        quality_scores = []
+        window_size = min(5, len(strides_clean))
+
+        for i in range(len(strides_clean)):
+            # Local neighborhood CV
+            start = max(0, i - window_size // 2)
+            end = min(len(strides_clean), i + window_size // 2 + 1)
+            local_strides = strides_clean[start:end]
+
+            if len(local_strides) > 1:
+                local_mean = np.mean(local_strides)
+                local_std = np.std(local_strides)
+                local_cv = local_std / local_mean if local_mean > 0 else 1.0
+
+                # Quality = 1 / (1 + CV)
+                quality = 1.0 / (1.0 + local_cv)
+            else:
+                quality = 1.0
+
+            quality_scores.append(quality)
+
+        quality_arr = np.array(quality_scores)
+
+        # Step 3: Prioritize high-quality strides (CV < 0.15 threshold = quality > 0.87)
+        high_quality_mask = quality_arr > 0.87
+
+        if np.sum(high_quality_mask) >= 3:
+            # Use only high-quality strides with weights
+            selected_strides = strides_clean[high_quality_mask]
+            selected_quality = quality_arr[high_quality_mask]
+
+            # Normalize weights
+            weights = selected_quality / np.sum(selected_quality)
+            weighted_median_mp = np.sum(selected_strides * weights)
+        else:
+            # Fallback: weighted average of all cleaned strides
+            weights = quality_arr / np.sum(quality_arr)
+            weighted_median_mp = np.sum(strides_clean * weights)
+
+        median_stride_mp = float(weighted_median_mp)
+        mean_stride_mp = float(np.mean(strides_clean))
+        std_stride_mp = float(np.std(strides_clean))
+        n_strides_used = len(strides_clean)
+        n_outliers_rejected = len(stride_arr) - len(strides_clean)
+    else:
+        # V5: Simple robust estimator (median)
+        median_stride_mp = float(np.median(stride_arr))
+        mean_stride_mp = float(np.mean(stride_arr))
+        std_stride_mp = float(np.std(stride_arr))
+        n_strides_used = len(stride_arr)
+        n_outliers_rejected = 0
 
     # Convert GT to meters
     gt_stride_length_m = gt_stride_length_cm / 100.0
@@ -227,13 +295,15 @@ def calculate_stride_based_scale_factor(
 
     diagnostics = {
         'n_strides': len(stride_distances_mp),
+        'n_strides_used': n_strides_used,
+        'n_outliers_rejected': n_outliers_rejected,
         'median_stride_mp': median_stride_mp,
         'mean_stride_mp': mean_stride_mp,
         'std_stride_mp': std_stride_mp,
         'cv_stride_mp': std_stride_mp / mean_stride_mp if mean_stride_mp > 0 else None,
         'gt_stride_length_m': gt_stride_length_m,
         'scale_factor': scale_factor,
-        'method': 'stride_based'
+        'method': 'stride_based_v52' if use_quality_weighting else 'stride_based'
     }
 
     return float(scale_factor), diagnostics
@@ -245,7 +315,9 @@ def calculate_hybrid_scale_factor(
     heel_strikes_right: List[int],
     gt_stride_left_cm: Optional[float],
     gt_stride_right_cm: Optional[float],
-    fallback_walkway_m: float = 7.5
+    fallback_walkway_m: float = 7.5,
+    use_quality_weighting: bool = False,
+    cross_leg_validation: bool = False
 ) -> Tuple[float, dict]:
     """
     Hybrid scaling: try stride-based first, fallback to walkway assumption.
@@ -257,41 +329,106 @@ def calculate_hybrid_scale_factor(
         gt_stride_left_cm: GT left stride length
         gt_stride_right_cm: GT right stride length
         fallback_walkway_m: Walkway distance for fallback
+        use_quality_weighting: Enable V5.2 quality-weighted scaling
+        cross_leg_validation: Enable V5.2 cross-leg agreement check
 
     Returns:
         scale_factor: Final scale factor
         diagnostics: Dict with method used and intermediate values
     """
-    scales = []
+    scale_entries = []
     diagnostics = {}
 
     # Try left foot
     if gt_stride_left_cm and len(heel_strikes_left) > 0:
         scale_left, diag_left = calculate_stride_based_scale_factor(
-            hip_trajectory, heel_strikes_left, gt_stride_left_cm
+            hip_trajectory, heel_strikes_left, gt_stride_left_cm,
+            use_quality_weighting=use_quality_weighting
         )
         if 'error' not in diag_left:
-            scales.append(scale_left)
+            scale_entries.append({'side': 'left', 'scale': scale_left, 'diag': diag_left})
             diagnostics['left'] = diag_left
 
     # Try right foot
     if gt_stride_right_cm and len(heel_strikes_right) > 0:
         scale_right, diag_right = calculate_stride_based_scale_factor(
-            hip_trajectory, heel_strikes_right, gt_stride_right_cm
+            hip_trajectory, heel_strikes_right, gt_stride_right_cm,
+            use_quality_weighting=use_quality_weighting
         )
         if 'error' not in diag_right:
-            scales.append(scale_right)
+            scale_entries.append({'side': 'right', 'scale': scale_right, 'diag': diag_right})
             diagnostics['right'] = diag_right
 
-    # Prefer stride-based if available
-    if scales:
-        final_scale = float(np.median(scales))
-        diagnostics['method'] = 'stride_based'
-        diagnostics['final_scale'] = final_scale
-        diagnostics['n_sides_used'] = len(scales)
+    # V5.2: Cross-leg validation
+    if cross_leg_validation and len(scale_entries) == 2:
+        left_scale = scale_entries[0]['scale']
+        right_scale = scale_entries[1]['scale']
+        mean_scale = (left_scale + right_scale) / 2.0
+        disagreement = abs(left_scale - right_scale) / mean_scale
 
-        if len(scales) == 2:
+        diagnostics['cross_leg_disagreement'] = float(disagreement)
+
+        # Reject if disagreement > 15%
+        if disagreement > 0.15:
+            diagnostics['cross_leg_validation_failed'] = True
+
+            # Keep the side with better quality (lower CV)
+            left_cv = scale_entries[0]['diag'].get('cv_stride_mp', 1.0)
+            right_cv = scale_entries[1]['diag'].get('cv_stride_mp', 1.0)
+
+            if left_cv < right_cv:
+                scale_entries = [scale_entries[0]]
+                diagnostics['rejected_side'] = 'right'
+                diagnostics['reason'] = f'cross_leg_disagreement_{disagreement:.2%}_kept_left'
+            else:
+                scale_entries = [scale_entries[1]]
+                diagnostics['rejected_side'] = 'left'
+                diagnostics['reason'] = f'cross_leg_disagreement_{disagreement:.2%}_kept_right'
+        else:
+            diagnostics['cross_leg_validation_passed'] = True
+
+    # Prefer stride-based if available
+    if scale_entries:
+        def _is_suspicious(entry: dict) -> bool:
+            diag = entry['diag']
+            if diag.get('n_strides', 0) <= 4:
+                return True
+            median = diag.get('median_stride_mp')
+            if median is not None and median < 0.05:
+                return True
+            cv = diag.get('cv_stride_mp')
+            if cv is not None and cv > 1.0:
+                return True
+            return False
+
+        valid_entries = [e for e in scale_entries if not _is_suspicious(e)]
+
+        if valid_entries:
+            chosen_entries = valid_entries
+        else:
+            best_entry = max(scale_entries, key=lambda e: e['diag'].get('n_strides', 0))
+            chosen_entries = [best_entry]
+            diagnostics['suspect_stride_data'] = True
+            diagnostics['suspect_details'] = {
+                entry['side']: {
+                    'n_strides': entry['diag'].get('n_strides'),
+                    'median_stride_mp': entry['diag'].get('median_stride_mp'),
+                    'cv_stride_mp': entry['diag'].get('cv_stride_mp'),
+                    'scale_factor': entry['scale']
+                }
+                for entry in scale_entries
+            }
+
+        scales = [e['scale'] for e in chosen_entries]
+        final_scale = float(np.median(scales))
+        diagnostics['method'] = 'stride_based_v52' if use_quality_weighting else 'stride_based'
+        diagnostics['final_scale'] = final_scale
+        diagnostics['n_sides_used'] = len(chosen_entries)
+
+        if len(chosen_entries) == 2:
             diagnostics['bilateral_agreement'] = abs(scales[0] - scales[1]) / np.mean(scales)
+        elif len(chosen_entries) == 1:
+            diagnostics['selected_side'] = chosen_entries[0]['side']
 
         return final_scale, diagnostics
 

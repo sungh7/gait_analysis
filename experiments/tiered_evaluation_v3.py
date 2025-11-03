@@ -1,17 +1,11 @@
 """
-Tiered gait evaluation pipeline v4.
+Tiered gait evaluation pipeline v3.
 
-Key updates over v3:
-1. **Phase 1 Integration**: Subject-specific stride-based scaling calibration
-2. Uses GT stride length instead of global walkway assumption
-3. Fallback to V3 global scaling if insufficient heel strikes
-4. Maintains all v3 functionality (processed_new, spatial metrics, waveforms)
-
-Change log:
-- Added calculate_stride_based_scale_factor()
-- Added calculate_hybrid_scale_factor() with bilateral averaging
-- Modified _analyze_temporal_v3() to use new scaling method
-- Added scale_diagnostics to output for validation
+Key updates over v2:
+1. Uses /data/gait/data/processed_new as the ground-truth source
+2. Supports expanded info.json structure with patient/normal metrics
+3. Adds spatial metrics (step length, stride length, velocity) to evaluation
+4. Maintains waveform and abnormality analysis from v2
 """
 
 from __future__ import annotations
@@ -170,156 +164,12 @@ def calculate_distance_scale_factor(hip_trajectory: np.ndarray, walkway_distance
     return float(scale_factor)
 
 
-def calculate_stride_based_scale_factor(
-    hip_trajectory: np.ndarray,
-    heel_strikes: List[int],
-    gt_stride_length_cm: float,
-    min_strikes: int = 3
-) -> Tuple[float, dict]:
-    """
-    Calculate subject-specific scale factor using GT stride length (Phase 1 method).
-
-    Args:
-        hip_trajectory: (N, 3) array of raw MediaPipe hip positions
-        heel_strikes: List of heel strike frame indices
-        gt_stride_length_cm: Ground truth stride length in cm
-        min_strikes: Minimum number of strikes needed
-
-    Returns:
-        scale_factor: Multiplier to convert MediaPipe coords to meters
-        diagnostics: Dict with intermediate values for debugging
-    """
-    if len(heel_strikes) < min_strikes:
-        return 1.0, {'error': 'insufficient_strikes', 'n_strikes': len(heel_strikes)}
-
-    if gt_stride_length_cm is None or gt_stride_length_cm <= 0:
-        return 1.0, {'error': 'invalid_gt_stride_length'}
-
-    # Calculate stride distances in raw MediaPipe coordinates
-    stride_distances_mp = []
-    for i in range(len(heel_strikes) - 1):
-        start_idx = heel_strikes[i]
-        end_idx = heel_strikes[i + 1]
-
-        if end_idx >= len(hip_trajectory) or start_idx >= len(hip_trajectory):
-            continue
-
-        displacement = hip_trajectory[end_idx] - hip_trajectory[start_idx]
-        distance = np.linalg.norm(displacement)
-        stride_distances_mp.append(distance)
-
-    if not stride_distances_mp:
-        return 1.0, {'error': 'no_valid_strides'}
-
-    # Robust estimator (median)
-    median_stride_mp = float(np.median(stride_distances_mp))
-    mean_stride_mp = float(np.mean(stride_distances_mp))
-    std_stride_mp = float(np.std(stride_distances_mp))
-
-    # Convert GT to meters
-    gt_stride_length_m = gt_stride_length_cm / 100.0
-
-    # Calculate scale factor
-    if median_stride_mp < 1e-6:
-        return 1.0, {'error': 'zero_stride_distance'}
-
-    scale_factor = gt_stride_length_m / median_stride_mp
-
-    diagnostics = {
-        'n_strides': len(stride_distances_mp),
-        'median_stride_mp': median_stride_mp,
-        'mean_stride_mp': mean_stride_mp,
-        'std_stride_mp': std_stride_mp,
-        'cv_stride_mp': std_stride_mp / mean_stride_mp if mean_stride_mp > 0 else None,
-        'gt_stride_length_m': gt_stride_length_m,
-        'scale_factor': scale_factor,
-        'method': 'stride_based'
-    }
-
-    return float(scale_factor), diagnostics
-
-
-def calculate_hybrid_scale_factor(
-    hip_trajectory: np.ndarray,
-    heel_strikes_left: List[int],
-    heel_strikes_right: List[int],
-    gt_stride_left_cm: Optional[float],
-    gt_stride_right_cm: Optional[float],
-    fallback_walkway_m: float = 7.5
-) -> Tuple[float, dict]:
-    """
-    Hybrid scaling: try stride-based first, fallback to walkway assumption.
-
-    Args:
-        hip_trajectory: (N, 3) raw MediaPipe hip positions
-        heel_strikes_left: Left foot strike indices
-        heel_strikes_right: Right foot strike indices
-        gt_stride_left_cm: GT left stride length
-        gt_stride_right_cm: GT right stride length
-        fallback_walkway_m: Walkway distance for fallback
-
-    Returns:
-        scale_factor: Final scale factor
-        diagnostics: Dict with method used and intermediate values
-    """
-    scales = []
-    diagnostics = {}
-
-    # Try left foot
-    if gt_stride_left_cm and len(heel_strikes_left) > 0:
-        scale_left, diag_left = calculate_stride_based_scale_factor(
-            hip_trajectory, heel_strikes_left, gt_stride_left_cm
-        )
-        if 'error' not in diag_left:
-            scales.append(scale_left)
-            diagnostics['left'] = diag_left
-
-    # Try right foot
-    if gt_stride_right_cm and len(heel_strikes_right) > 0:
-        scale_right, diag_right = calculate_stride_based_scale_factor(
-            hip_trajectory, heel_strikes_right, gt_stride_right_cm
-        )
-        if 'error' not in diag_right:
-            scales.append(scale_right)
-            diagnostics['right'] = diag_right
-
-    # Prefer stride-based if available
-    if scales:
-        final_scale = float(np.median(scales))
-        diagnostics['method'] = 'stride_based'
-        diagnostics['final_scale'] = final_scale
-        diagnostics['n_sides_used'] = len(scales)
-
-        if len(scales) == 2:
-            diagnostics['bilateral_agreement'] = abs(scales[0] - scales[1]) / np.mean(scales)
-
-        return final_scale, diagnostics
-
-    # Fallback: total distance method (V3 method)
-    diffs = np.diff(hip_trajectory, axis=0)
-    distances = np.linalg.norm(diffs, axis=1)
-    total_distance_mp = np.sum(distances)
-    expected_distance_m = 2.0 * fallback_walkway_m
-
-    fallback_scale = expected_distance_m / total_distance_mp if total_distance_mp > 1e-6 else 1.0
-
-    diagnostics['method'] = 'fallback_walkway'
-    diagnostics['total_distance_mp'] = float(total_distance_mp)
-    diagnostics['expected_distance_m'] = expected_distance_m
-    diagnostics['final_scale'] = fallback_scale
-    diagnostics['reason'] = 'insufficient_strikes_both_feet'
-
-    return float(fallback_scale), diagnostics
-
-
 # ---------------------------------------------------------------------------
-# Core evaluator v4
+# Core evaluator v2
 # ---------------------------------------------------------------------------
 
-class TieredGaitEvaluatorV4:
+class TieredGaitEvaluatorV3:
     """
-    V4: Enhanced with Phase 1 stride-based scaling calibration.
-
     Enhanced gait evaluation with:
     - Distance scale correction
     - Direction-specific cadence
@@ -446,29 +296,13 @@ class TieredGaitEvaluatorV4:
         hip_z = df_angles['z_left_hip'].values
         hip_traj = np.column_stack([hip_x, hip_y, hip_z])
 
-        # Detect heel strikes (before scaling - needed for stride-based calibration)
+        # Calculate distance scale factor and convert trajectory to real-world meters
+        scale_factor = calculate_distance_scale_factor(hip_traj, self.walkway_distance_m)
+        hip_traj_scaled = hip_traj * scale_factor
+
+        # Detect heel strikes
         left_strikes = self.processor.detect_heel_strikes_fusion(df_angles, side='left', fps=fps)
         right_strikes = self.processor.detect_heel_strikes_fusion(df_angles, side='right', fps=fps)
-
-        # V4: Extract GT stride lengths for calibration
-        patient = info.get('patient', {})
-        patient_left = patient.get('left', {})
-        patient_right = patient.get('right', {})
-        gt_stride_left_cm = patient_left.get('stride_length_cm')
-        gt_stride_right_cm = patient_right.get('stride_length_cm')
-
-        # V4: Calculate subject-specific scale factor using stride-based method
-        scale_factor, scale_diagnostics = calculate_hybrid_scale_factor(
-            hip_traj,
-            left_strikes,
-            right_strikes,
-            gt_stride_left_cm,
-            gt_stride_right_cm,
-            fallback_walkway_m=self.walkway_distance_m
-        )
-
-        # Convert trajectory to real-world meters
-        hip_traj_scaled = hip_traj * scale_factor
 
         # Detect direction changes (turn points)
         turn_points, gait_speed = self._detect_turn_points_adaptive(hip_traj_scaled, fps)
@@ -579,86 +413,30 @@ class TieredGaitEvaluatorV4:
         pred_stance_left = float(np.mean([c['stance_pct'] for c in left_cycles_dir if c['direction'] != 'turn'])) if left_cycles_dir else 0.0
         pred_stance_right = float(np.mean([c['stance_pct'] for c in right_cycles_dir if c['direction'] != 'turn'])) if right_cycles_dir else 0.0
 
-        allowed_directions = {'outbound', 'inbound'}
-        left_allowed_pairs = {
-            (cycle['start'], cycle['end'])
-            for cycle in left_cycles_dir
-            if cycle.get('direction') in allowed_directions
-        }
-        right_allowed_pairs = {
-            (cycle['start'], cycle['end'])
-            for cycle in right_cycles_dir
-            if cycle.get('direction') in allowed_directions
-        }
-        min_filtered_strides = 3
-
         # Spatial metrics derived from hip trajectory
-        def compute_stride_metrics(
-            strikes: List[int],
-            allowed_pairs: Optional[set]
-        ) -> Tuple[float, float, float, Dict[str, float]]:
-            stats: Dict[str, float] = {
-                'strides_total': 0.0,
-                'strides_filtered': 0.0,
-                'using_filtered': False
-            }
+        def compute_stride_metrics(strikes: List[int]) -> Tuple[float, float, float]:
             if strikes is None or len(strikes) < 2 or fps <= 0:
-                return float("nan"), float("nan"), float("nan"), stats
-
-            stride_lengths_all: List[float] = []
-            stride_velocities_all: List[float] = []
-            stride_lengths_filtered: List[float] = []
-            stride_velocities_filtered: List[float] = []
-
+                return float("nan"), float("nan"), float("nan")
+            stride_lengths = []
+            stride_velocities = []
             for idx in range(len(strikes) - 1):
                 start = strikes[idx]
                 end = strikes[idx + 1]
                 if end >= len(hip_traj_scaled) or start >= len(hip_traj_scaled):
                     continue
-
                 displacement = hip_traj_scaled[end] - hip_traj_scaled[start]
                 stride_length_cm = float(np.linalg.norm(displacement) * 100.0)
-                duration_sec = (end - start) / fps if fps > 0 else 0.0
-
-                stride_lengths_all.append(stride_length_cm)
+                stride_lengths.append(stride_length_cm)
+                duration_sec = (end - start) / fps
                 if duration_sec > 0:
-                    stride_velocities_all.append(stride_length_cm / duration_sec)
-
-                pair = (start, end)
-                if not allowed_pairs or pair in allowed_pairs:
-                    stride_lengths_filtered.append(stride_length_cm)
-                    if duration_sec > 0:
-                        stride_velocities_filtered.append(stride_length_cm / duration_sec)
-
-            stats['strides_total'] = float(len(stride_lengths_all))
-            stats['strides_filtered'] = float(len(stride_lengths_filtered))
-
-            use_filtered = len(stride_lengths_filtered) >= min_filtered_strides
-            stats['using_filtered'] = bool(use_filtered)
-
-            if use_filtered:
-                stride_lengths_use = stride_lengths_filtered
-                stride_velocities_use = stride_velocities_filtered
-            else:
-                stride_lengths_use = stride_lengths_all
-                stride_velocities_use = stride_velocities_all
-
-            if not stride_lengths_use:
-                return float("nan"), float("nan"), float("nan"), stats
-
-            avg_stride_length = float(np.mean(stride_lengths_use))
+                    stride_velocities.append(stride_length_cm / duration_sec)
+            avg_stride_length = float(np.mean(stride_lengths)) if stride_lengths else float("nan")
             avg_step_length = avg_stride_length / 2.0 if np.isfinite(avg_stride_length) else float("nan")
-            avg_velocity = float(np.mean(stride_velocities_use)) if stride_velocities_use else float("nan")
-            return avg_step_length, avg_stride_length, avg_velocity, stats
+            avg_velocity = float(np.mean(stride_velocities)) if stride_velocities else float("nan")
+            return avg_step_length, avg_stride_length, avg_velocity
 
-        pred_step_length_left, pred_stride_length_left, pred_velocity_left, left_stride_stats = compute_stride_metrics(
-            left_strikes,
-            left_allowed_pairs
-        )
-        pred_step_length_right, pred_stride_length_right, pred_velocity_right, right_stride_stats = compute_stride_metrics(
-            right_strikes,
-            right_allowed_pairs
-        )
+        pred_step_length_left, pred_stride_length_left, pred_velocity_left = compute_stride_metrics(left_strikes)
+        pred_step_length_right, pred_stride_length_right, pred_velocity_right = compute_stride_metrics(right_strikes)
 
         def velocity_from_step(step_length_cm: float, cadence_steps_min: float) -> float:
             if step_length_cm is None or cadence_steps_min is None:
@@ -684,11 +462,6 @@ class TieredGaitEvaluatorV4:
             pred_velocity_right = velocity_right_formula
         elif not np.isfinite(pred_velocity_right):
             pred_velocity_right = overall_velocity_cm_s
-
-        turn_cycles_left = sum(1 for c in left_cycles_dir if c.get('direction') == 'turn')
-        turn_cycles_right = sum(1 for c in right_cycles_dir if c.get('direction') == 'turn')
-        straight_cycles_left = len(left_cycles_dir) - turn_cycles_left
-        straight_cycles_right = len(right_cycles_dir) - turn_cycles_right
 
         # Register metrics for aggregate analysis
         self._register_temporal_metric("strides_left", gt_strides_left, pred_strides_left)
@@ -765,24 +538,7 @@ class TieredGaitEvaluatorV4:
                 "left": to_serializable(pred_velocity_left),
                 "right": to_serializable(pred_velocity_right)
             },
-            "stride_filter_stats": {
-                "left": {
-                    "strides_total": to_serializable(left_stride_stats['strides_total']),
-                    "strides_filtered": to_serializable(left_stride_stats['strides_filtered']),
-                    "using_filtered": bool(left_stride_stats['using_filtered']),
-                    "straight_cycles": to_serializable(straight_cycles_left),
-                    "turn_cycles": to_serializable(turn_cycles_left)
-                },
-                "right": {
-                    "strides_total": to_serializable(right_stride_stats['strides_total']),
-                    "strides_filtered": to_serializable(right_stride_stats['strides_filtered']),
-                    "using_filtered": bool(right_stride_stats['using_filtered']),
-                    "straight_cycles": to_serializable(straight_cycles_right),
-                    "turn_cycles": to_serializable(turn_cycles_right)
-                }
-            },
             "scale_factor": to_serializable(scale_factor),
-            "scale_diagnostics": scale_diagnostics,  # V4: Added for validation
             "gait_speed_m_s": to_serializable(gait_speed),
             "adaptive_buffer_frames": to_serializable(turn_buffer_frames)
         }
@@ -1179,8 +935,8 @@ class TieredGaitEvaluatorV4:
 
 
 def main():
-    """Run tiered evaluation v4 with Phase 1 stride-based scaling."""
-    evaluator = TieredGaitEvaluatorV4(
+    """Run tiered evaluation v3."""
+    evaluator = TieredGaitEvaluatorV3(
         walkway_distance_m=7.5,
         base_turn_buffer_sec=0.5
     )
@@ -1188,12 +944,12 @@ def main():
     results = evaluator.evaluate()
 
     # Save results
-    output_path = Path("/data/gait/tiered_evaluation_report_v4.json")
+    output_path = Path("/data/gait/tiered_evaluation_report_v3.json")
     with open(output_path, 'w') as f:
         json.dump(results, f, indent=2)
 
     print(f"\n{'='*60}")
-    print(f"V4 Results (Phase 1 integrated) saved to: {output_path}")
+    print(f"Results saved to: {output_path}")
     print(f"{'='*60}")
 
     # Print summary
