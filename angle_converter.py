@@ -39,9 +39,9 @@ class AngleConverter:
             self._load_coordinate_report(coordinate_report)
 
         self.method_registry = {
-            'knee': ['joint_angle', 'joint_angle_inverted', 'projected_2d'],
+            'knee': ['joint_angle', 'joint_angle_flexion', 'joint_angle_inverted', 'projected_2d'],
             'hip': ['segment_to_vertical', 'joint_angle', 'trunk_relative', 'pelvic_tilt'],
-            'ankle': ['joint_angle', 'segment_to_horizontal', 'foot_ground_angle'],
+            'ankle': ['joint_angle', 'joint_angle_flexion', 'segment_to_horizontal', 'foot_ground_angle'],
         }
 
         # Conversion methods: linear, polynomial, piecewise, spline
@@ -126,6 +126,8 @@ class AngleConverter:
             knee = self._extract_point(landmarks, side, 'knee')
             ankle = self._extract_point(landmarks, side, 'ankle')
             angle = self._joint_angle(hip, knee, ankle)
+            if method == 'joint_angle_flexion':
+                return 180.0 - angle
             if method == 'joint_angle_inverted':
                 return 180.0 - angle
             if method == 'projected_2d':
@@ -204,6 +206,9 @@ class AngleConverter:
             ankle = self._extract_point(landmarks, side, 'ankle')
             foot = self._extract_point(landmarks, side, 'foot_index')
             heel = self._extract_point(landmarks, side, 'heel')
+            if method == 'joint_angle_flexion':
+                base = self._joint_angle(knee, ankle, foot)
+                return 180.0 - base
 
             if method == 'segment_to_horizontal':
                 segment = foot - ankle
@@ -350,6 +355,12 @@ class AngleConverter:
         # Non-negative least squares for stability (allows scale >= 0)
         coeffs, _ = nnls(A, targ)
         offset, scale = float(coeffs[0]), float(coeffs[1])
+        if scale < 1e-3:
+            # Fallback to unconstrained least squares to avoid degenerate scaling
+            coeffs_ls, _, _, _ = np.linalg.lstsq(A, targ, rcond=None)
+            offset, scale = float(coeffs_ls[0]), float(coeffs_ls[1])
+            if abs(scale) < 1e-3:
+                scale = 1.0
         return offset, scale
 
     def _fit_polynomial_alignment(
@@ -435,6 +446,59 @@ class AngleConverter:
                 mask = (pred >= lower) & (pred < upper_bound)
             result[mask] = offset + scale * pred[mask]
         return result
+
+    def apply_conversion(
+        self,
+        raw_series: np.ndarray,
+        conversion: str,
+        params: Dict[str, object],
+    ) -> np.ndarray:
+        """Apply a stored conversion to a raw angle series."""
+        if raw_series is None:
+            return None
+
+        series = np.asarray(raw_series, dtype=float)
+        converted = np.full_like(series, np.nan, dtype=float)
+        valid = ~np.isnan(series)
+        if not valid.any():
+            return converted
+
+        if conversion == 'linear':
+            offset = float(params.get('offset', 0.0))
+            scale = float(params.get('scale', 1.0))
+            converted[valid] = offset + scale * series[valid]
+            return converted
+
+        if conversion in {'polynomial_2nd', 'ridge'}:
+            coeffs = params.get('coeffs')
+            if coeffs is None:
+                converted[valid] = series[valid]
+                return converted
+            coeffs = np.asarray(coeffs, dtype=float)
+            order = len(coeffs)
+            X = np.column_stack([series[valid] ** i for i in range(order)])
+            converted[valid] = X @ coeffs
+            return converted
+
+        if conversion == 'piecewise':
+            segments = params.get('segments') or []
+            if not segments:
+                converted[valid] = series[valid]
+                return converted
+            normalized_segments = [
+                (
+                    float(seg.get('offset') if isinstance(seg, dict) else seg[0]),
+                    float(seg.get('scale') if isinstance(seg, dict) else seg[1]),
+                    float(seg.get('upper') if isinstance(seg, dict) else seg[2]),
+                )
+                for seg in segments
+            ]
+            converted[valid] = self._apply_piecewise_transform(series[valid], normalized_segments)
+            return converted
+
+        # Fallback: no conversion applied
+        converted[valid] = series[valid]
+        return converted
 
     def _evaluate_dataset_linear(
         self,
@@ -574,13 +638,20 @@ class AngleConverter:
     # ------------------------------------------------------------------
     # Persistence helpers
     # ------------------------------------------------------------------
-    def register_best_method(self, joint_type: str, side: str, method: str, offset: float, scale: float) -> None:
+    def register_best_method(
+        self,
+        joint_type: str,
+        side: str,
+        method: str,
+        conversion: str,
+        params: Dict[str, object],
+    ) -> None:
         joint_type = joint_type.lower()
         side = side.lower()
         self.conversion_params.setdefault(joint_type, {})[side] = {
             'method': method,
-            'offset': offset,
-            'scale': scale,
+            'conversion': conversion,
+            'params': params,
         }
 
     def save_parameters(self, output_path: str) -> None:
