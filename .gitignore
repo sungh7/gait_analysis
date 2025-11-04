@@ -48,3 +48,4 @@ experiments/*.csv
 experiments/*.txt
 experiments/*.log
 
+gavd_patterns_with_v7_features.json
