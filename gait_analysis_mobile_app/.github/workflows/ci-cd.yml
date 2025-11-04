@@ -1,0 +1,602 @@
+name: 🚀 CI/CD Pipeline - Gait Analysis Pro
+
+on:
+  push:
+    branches: [ main, develop, 'feature/*', 'hotfix/*' ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+env:
+  FLUTTER_VERSION: '3.16.0'
+  JAVA_VERSION: '17'
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ========================================
+  # 1. CODE QUALITY & SECURITY
+  # ========================================
+  code-quality:
+    name: 🔍 Code Quality & Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🔍 Analyze Code
+        run: |
+          flutter analyze --fatal-infos
+          dart format --set-exit-if-changed .
+
+      - name: 🛡️ Security Scan
+        uses: securecodewarrior/github-action-add-sarif@v1
+        with:
+          sarif-file: 'security-scan-results.sarif'
+
+      - name: 📊 Code Coverage Setup
+        run: |
+          flutter pub global activate coverage
+          flutter test --coverage
+
+      - name: 📈 Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: coverage/lcov.info
+          flags: flutter
+          name: flutter-coverage
+
+  # ========================================
+  # 2. UNIT & WIDGET TESTS
+  # ========================================
+  test:
+    name: 🧪 Unit & Widget Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      matrix:
+        test-suite: ['unit', 'widget', 'integration']
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🧪 Run Tests
+        run: |
+          case "${{ matrix.test-suite }}" in
+            "unit")
+              flutter test test/unit/ --coverage --reporter=github
+              ;;
+            "widget")
+              flutter test test/widget/ --coverage --reporter=github
+              ;;
+            "integration")
+              flutter test test/integration/ --coverage --reporter=github
+              ;;
+          esac
+
+      - name: 📊 Generate Test Report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: "📋 ${{ matrix.test-suite }} Test Results"
+          path: test-results.json
+          reporter: flutter-json
+
+  # ========================================
+  # 3. BUILD ANDROID
+  # ========================================
+  build-android:
+    name: 🤖 Build Android
+    runs-on: ubuntu-latest
+    needs: [code-quality, test]
+    timeout-minutes: 45
+
+    strategy:
+      matrix:
+        build-type: ['debug', 'profile', 'release']
+        exclude:
+          - build-type: 'profile'
+            if: github.ref != 'refs/heads/main'
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🔑 Setup Android Signing
+        if: matrix.build-type == 'release'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_PROPERTIES: ${{ secrets.ANDROID_KEY_PROPERTIES }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+          echo "$ANDROID_KEY_PROPERTIES" > android/key.properties
+
+      - name: 🏗️ Build Android APK/AAB
+        run: |
+          if [ "${{ matrix.build-type }}" = "release" ]; then
+            flutter build appbundle --release --dart-define=ENVIRONMENT=production
+            flutter build apk --release --dart-define=ENVIRONMENT=production
+          else
+            flutter build apk --${{ matrix.build-type }} --dart-define=ENVIRONMENT=development
+          fi
+
+      - name: 📦 Upload Android Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: android-${{ matrix.build-type }}-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/
+            build/app/outputs/bundle/
+          retention-days: 30
+
+      - name: 🔍 Android Security Scan
+        if: matrix.build-type == 'release'
+        uses: github/super-linter@v4
+        env:
+          VALIDATE_ANDROID: true
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ========================================
+  # 4. BUILD iOS
+  # ========================================
+  build-ios:
+    name: 🍎 Build iOS
+    runs-on: macos-latest
+    needs: [code-quality, test]
+    timeout-minutes: 60
+
+    strategy:
+      matrix:
+        build-type: ['debug', 'profile', 'release']
+        exclude:
+          - build-type: 'profile'
+            if: github.ref != 'refs/heads/main'
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 📱 Setup iOS Dependencies
+        run: |
+          cd ios
+          pod install --repo-update
+
+      - name: 🔑 Setup iOS Signing
+        if: matrix.build-type == 'release'
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        run: |
+          # 키체인 설정
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+
+          # 인증서 설치
+          echo "$IOS_CERTIFICATE_BASE64" | base64 -d > certificate.p12
+          security import certificate.p12 -k build.keychain -P "$IOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+
+          # 프로비저닝 프로파일 설치
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -d > profile.mobileprovision
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: 🏗️ Build iOS
+        run: |
+          if [ "${{ matrix.build-type }}" = "release" ]; then
+            flutter build ios --release --no-codesign --dart-define=ENVIRONMENT=production
+          else
+            flutter build ios --${{ matrix.build-type }} --no-codesign --dart-define=ENVIRONMENT=development
+          fi
+
+      - name: 📦 Archive iOS App
+        if: matrix.build-type == 'release'
+        run: |
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Runner.xcarchive \
+            archive
+
+      - name: 📦 Upload iOS Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-${{ matrix.build-type }}-${{ github.sha }}
+          path: |
+            build/ios/
+            ios/build/
+          retention-days: 30
+
+  # ========================================
+  # 5. INTEGRATION TESTS
+  # ========================================
+  integration-tests:
+    name: 🔄 Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build-android]
+    timeout-minutes: 30
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: 🤖 Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: 📱 Setup Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          script: |
+            flutter drive --driver=test_driver/integration_test.dart --target=integration_test/app_test.dart
+
+      - name: 📊 Upload Integration Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results-${{ github.sha }}
+          path: |
+            integration_test/screenshots/
+            test-results/
+          retention-days: 14
+
+  # ========================================
+  # 6. PERFORMANCE TESTING
+  # ========================================
+  performance-tests:
+    name: ⚡ Performance Tests
+    runs-on: ubuntu-latest
+    needs: [build-android]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+    timeout-minutes: 25
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🎯 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: 📦 Get Dependencies
+        run: flutter pub get
+
+      - name: ⚡ Run Performance Tests
+        run: |
+          flutter test test/performance/ --reporter=github
+          flutter drive --driver=test_driver/perf_test.dart --target=test_driver/perf_app.dart --profile
+
+      - name: 📊 Generate Performance Report
+        run: |
+          flutter pub global activate flutter_performance_testing
+          flutter pub global run flutter_performance_testing:generate_report
+
+      - name: 📈 Upload Performance Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results-${{ github.sha }}
+          path: performance-results/
+          retention-days: 30
+
+  # ========================================
+  # 7. SECURITY SCANNING
+  # ========================================
+  security-scan:
+    name: 🔒 Security Scanning
+    runs-on: ubuntu-latest
+    needs: [code-quality]
+    timeout-minutes: 20
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔍 Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: 📊 Upload Trivy Results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: 🛡️ Run Semgrep Security Scanner
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/flutter
+
+  # ========================================
+  # 8. DOCKER BUILD & PUSH
+  # ========================================
+  docker-build:
+    name: 🐳 Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: [build-android, build-ios]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'release'
+    timeout-minutes: 30
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Login to Google Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: gcr.io
+          username: _json_key
+          password: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🏗️ Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🐳 Build and Push Docker Images
+        run: |
+          # API Gateway
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/api-gateway:${{ github.sha }} \
+            --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/api-gateway:latest \
+            --push \
+            -f docker/api-gateway.Dockerfile .
+
+          # ML Service
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/ml-service:${{ github.sha }} \
+            --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/ml-service:latest \
+            --push \
+            -f docker/ml-service.Dockerfile .
+
+  # ========================================
+  # 9. DEPLOY TO STAGING
+  # ========================================
+  deploy-staging:
+    name: 🚀 Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [integration-tests, docker-build]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    timeout-minutes: 15
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: 🏗️ Configure kubectl
+        run: |
+          gcloud container clusters get-credentials gait-analysis-cluster \
+            --zone us-central1-a \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: 🚀 Deploy to Staging
+        run: |
+          # Update image tags in Kubernetes manifests
+          sed -i "s|gcr.io/${{ secrets.GCP_PROJECT_ID }}/api-gateway:latest|gcr.io/${{ secrets.GCP_PROJECT_ID }}/api-gateway:${{ github.sha }}|" k8s/staging/api-gateway-deployment.yaml
+          sed -i "s|gcr.io/${{ secrets.GCP_PROJECT_ID }}/ml-service:latest|gcr.io/${{ secrets.GCP_PROJECT_ID }}/ml-service:${{ github.sha }}|" k8s/staging/ml-service-deployment.yaml
+
+          # Apply Kubernetes manifests
+          kubectl apply -f k8s/staging/
+
+          # Wait for rollout
+          kubectl rollout status deployment/api-gateway -n gait-analysis-staging
+          kubectl rollout status deployment/ml-service -n gait-analysis-staging
+
+      - name: 🔍 Smoke Tests
+        run: |
+          # Wait for services to be ready
+          kubectl wait --for=condition=ready pod -l app=api-gateway -n gait-analysis-staging --timeout=300s
+
+          # Run smoke tests
+          curl -f https://api-staging.gaitanalysis.com/health || exit 1
+
+  # ========================================
+  # 10. DEPLOY TO PRODUCTION
+  # ========================================
+  deploy-production:
+    name: 🌟 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, performance-tests, security-scan]
+    if: github.event_name == 'release'
+    environment: production
+    timeout-minutes: 20
+
+    steps:
+      - name: 📚 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: 🏗️ Configure kubectl
+        run: |
+          gcloud container clusters get-credentials gait-analysis-cluster \
+            --zone us-central1-a \
+            --project ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: 🚀 Deploy to Production
+        run: |
+          # Blue-Green Deployment Strategy
+          kubectl apply -f k8s/production/
+
+          # Gradual rollout with canary deployment
+          kubectl patch deployment api-gateway -n gait-analysis \
+            -p '{"spec":{"strategy":{"rollingUpdate":{"maxSurge":"25%","maxUnavailable":"0"}}}}'
+
+          kubectl set image deployment/api-gateway \
+            api-gateway=gcr.io/${{ secrets.GCP_PROJECT_ID }}/api-gateway:${{ github.sha }} \
+            -n gait-analysis
+
+          kubectl rollout status deployment/api-gateway -n gait-analysis --timeout=600s
+
+      - name: 🔍 Production Health Check
+        run: |
+          # Comprehensive health checks
+          for i in {1..10}; do
+            if curl -f https://api.gaitanalysis.com/health; then
+              echo "Health check passed on attempt $i"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "Health check failed after 10 attempts"
+              exit 1
+            fi
+            sleep 30
+          done
+
+      - name: 📱 Deploy to App Stores
+        if: github.event_name == 'release'
+        run: |
+          # Deploy to Google Play Store (using Fastlane)
+          cd android
+          bundle exec fastlane deploy_production
+
+          # Deploy to Apple App Store (using Fastlane)
+          cd ../ios
+          bundle exec fastlane deploy_production
+
+  # ========================================
+  # 11. MONITORING & NOTIFICATIONS
+  # ========================================
+  post-deployment:
+    name: 📊 Post-Deployment Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: always() && (github.ref == 'refs/heads/main' || github.event_name == 'release')
+    timeout-minutes: 10
+
+    steps:
+      - name: 📈 Setup Monitoring
+        run: |
+          # Trigger monitoring alerts
+          curl -X POST "${{ secrets.DATADOG_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "title": "Gait Analysis Pro Deployment",
+              "text": "New deployment completed: ${{ github.sha }}",
+              "priority": "normal",
+              "tags": ["deployment", "production"]
+            }'
+
+      - name: 💬 Slack Notification
+        uses: 8398a7/action-slack@v3
+        if: always()
+        with:
+          status: ${{ job.status }}
+          channel: '#deployment'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+
+      - name: 📧 Email Notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "🚨 Gait Analysis Pro Deployment Failed"
+          to: team@gaitanalysis.com
+          from: ci-cd@gaitanalysis.com
+          body: |
+            Deployment failed for commit ${{ github.sha }}
+
+            Workflow: ${{ github.workflow }}
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref }}
+
+            Please check the workflow logs for details.
+
+# ========================================
+# WORKFLOW CONFIGURATION
+# ========================================
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

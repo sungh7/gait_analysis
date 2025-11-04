@@ -1,0 +1,112 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection - users can only access their own data
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Patients collection - only authenticated healthcare providers can access
+    match /patients/{patientId} {
+      allow read, write: if request.auth != null
+        && hasRole(['doctor', 'technician', 'admin'])
+        && (resource == null || belongsToOrganization(resource.data.organizationId));
+
+      // Patient analysis results subcollection
+      match /analyses/{analysisId} {
+        allow read, write: if request.auth != null
+          && hasRole(['doctor', 'technician', 'admin'])
+          && (resource == null || belongsToOrganization(get(/databases/$(database)/documents/patients/$(patientId)).data.organizationId));
+      }
+    }
+
+    // Organizations collection - only admins and members can access
+    match /organizations/{orgId} {
+      allow read: if request.auth != null
+        && (hasRole(['admin']) || belongsToOrganization(orgId));
+      allow write: if request.auth != null && hasRole(['admin']);
+
+      // Organization members subcollection
+      match /members/{userId} {
+        allow read: if request.auth != null
+          && (request.auth.uid == userId || hasRole(['admin']) || belongsToOrganization(orgId));
+        allow write: if request.auth != null && hasRole(['admin']);
+      }
+    }
+
+    // Analysis results collection - global access for authorized users
+    match /analyses/{analysisId} {
+      allow read: if request.auth != null
+        && (hasRole(['doctor', 'technician', 'admin', 'researcher'])
+        && (resource.data.isPublic == true || resource.data.createdBy == request.auth.uid));
+      allow create: if request.auth != null
+        && hasRole(['doctor', 'technician', 'admin'])
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if request.auth != null
+        && (resource.data.createdBy == request.auth.uid || hasRole(['admin']));
+      allow delete: if request.auth != null && hasRole(['admin']);
+    }
+
+    // Research data collection - read-only for researchers, write for system
+    match /research/{dataId} {
+      allow read: if request.auth != null && hasRole(['researcher', 'admin']);
+      allow write: if request.auth != null && hasRole(['system', 'admin']);
+    }
+
+    // System logs - admin only
+    match /logs/{logId} {
+      allow read, write: if request.auth != null && hasRole(['admin']);
+    }
+
+    // Application settings - admin only
+    match /settings/{settingId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && hasRole(['admin']);
+    }
+
+    // Helper functions
+    function hasRole(roles) {
+      return request.auth.token.role in roles;
+    }
+
+    function belongsToOrganization(orgId) {
+      return request.auth.token.organizationId == orgId;
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isValidPatientData() {
+      return request.resource.data.keys().hasAll(['name', 'age', 'gender', 'height', 'weight'])
+        && request.resource.data.age is number
+        && request.resource.data.age >= 0
+        && request.resource.data.age <= 150
+        && request.resource.data.height is number
+        && request.resource.data.height > 0
+        && request.resource.data.weight is number
+        && request.resource.data.weight > 0
+        && request.resource.data.gender in ['male', 'female', 'other'];
+    }
+
+    function isValidAnalysisData() {
+      return request.resource.data.keys().hasAll(['patientId', 'videoPath', 'timestamp', 'gaitParameters'])
+        && request.resource.data.timestamp is timestamp
+        && request.resource.data.gaitParameters is map;
+    }
+
+    // Rate limiting and security
+    function isNotSpamming() {
+      return request.time > resource.data.lastUpdate + duration.value(1, 's');
+    }
+
+    function isValidFileSize() {
+      return request.resource.size < 10 * 1024 * 1024; // 10MB limit
+    }
+  }
+}

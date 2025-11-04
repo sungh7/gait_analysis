@@ -1,0 +1,855 @@
+openapi: 3.0.3
+info:
+  title: Gait Analysis Pro - Microservices API
+  description: |
+    Enterprise-grade gait analysis platform microservices API specification.
+    Designed for scalability, security, and clinical compliance.
+  version: 1.0.0
+  contact:
+    name: Gait Analysis Team
+    email: api@gaitanalysis.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.gaitanalysis.com/v1
+    description: Production server
+  - url: https://api-staging.gaitanalysis.com/v1
+    description: Staging server
+  - url: https://api-dev.gaitanalysis.com/v1
+    description: Development server
+
+security:
+  - bearerAuth: []
+  - apiKey: []
+
+paths:
+  # Authentication Service
+  /auth/login:
+    post:
+      summary: User authentication
+      tags: [Authentication]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  # Patient Management Service
+  /patients:
+    get:
+      summary: Get patients list
+      tags: [Patients]
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Patients list retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientsListResponse'
+
+    post:
+      summary: Create new patient
+      tags: [Patients]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePatientRequest'
+      responses:
+        '201':
+          description: Patient created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+
+  /patients/{patientId}:
+    get:
+      summary: Get patient details
+      tags: [Patients]
+      parameters:
+        - name: patientId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Patient details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+
+    put:
+      summary: Update patient information
+      tags: [Patients]
+      parameters:
+        - name: patientId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePatientRequest'
+      responses:
+        '200':
+          description: Patient updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+
+  # Video Processing Service
+  /videos/upload:
+    post:
+      summary: Upload video for analysis
+      tags: [Video Processing]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                video:
+                  type: string
+                  format: binary
+                patientId:
+                  type: string
+                metadata:
+                  type: string
+                  description: JSON string with video metadata
+      responses:
+        '201':
+          description: Video uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VideoUploadResponse'
+
+  /videos/{videoId}/status:
+    get:
+      summary: Get video processing status
+      tags: [Video Processing]
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Processing status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingStatusResponse'
+
+  # ML Service
+  /ml/analyze:
+    post:
+      summary: Analyze gait from video
+      tags: [ML Service]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GaitAnalysisRequest'
+      responses:
+        '200':
+          description: Analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GaitAnalysisResponse'
+        '202':
+          description: Analysis started, processing asynchronously
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncProcessingResponse'
+
+  /ml/models/health:
+    get:
+      summary: Check ML models health
+      tags: [ML Service]
+      responses:
+        '200':
+          description: Models are healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelsHealthResponse'
+
+  # Analysis Results Service
+  /analyses:
+    get:
+      summary: Get analysis history
+      tags: [Analysis Results]
+      parameters:
+        - name: patientId
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Analysis history retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisHistoryResponse'
+
+  /analyses/{analysisId}:
+    get:
+      summary: Get analysis details
+      tags: [Analysis Results]
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Analysis details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GaitAnalysisResult'
+
+  /analyses/{analysisId}/export:
+    get:
+      summary: Export analysis result
+      tags: [Analysis Results]
+      parameters:
+        - name: analysisId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [pdf, csv, json]
+            default: pdf
+      responses:
+        '200':
+          description: Analysis exported successfully
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            text/csv:
+              schema:
+                type: string
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GaitAnalysisResult'
+
+  # Monitoring & Analytics Service
+  /monitoring/metrics:
+    get:
+      summary: Get system metrics
+      tags: [Monitoring]
+      responses:
+        '200':
+          description: System metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemMetrics'
+
+  /analytics/usage:
+    get:
+      summary: Get usage analytics
+      tags: [Analytics]
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Usage analytics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageAnalytics'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    # Authentication Schemas
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        tokenType:
+          type: string
+          default: Bearer
+        user:
+          $ref: '#/components/schemas/User'
+
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, doctor, technician, researcher]
+        permissions:
+          type: array
+          items:
+            type: string
+
+    # Patient Schemas
+    Patient:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        age:
+          type: integer
+          minimum: 0
+          maximum: 150
+        height:
+          type: number
+          format: float
+          description: Height in centimeters
+        weight:
+          type: number
+          format: float
+          description: Weight in kilograms
+        gender:
+          type: string
+          enum: [male, female, other]
+        medicalConditions:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreatePatientRequest:
+      type: object
+      required: [name, age, height, weight, gender]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        age:
+          type: integer
+          minimum: 0
+          maximum: 150
+        height:
+          type: number
+          format: float
+          minimum: 50
+          maximum: 250
+        weight:
+          type: number
+          format: float
+          minimum: 10
+          maximum: 500
+        gender:
+          type: string
+          enum: [male, female, other]
+        medicalConditions:
+          type: array
+          items:
+            type: string
+
+    UpdatePatientRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        age:
+          type: integer
+          minimum: 0
+          maximum: 150
+        height:
+          type: number
+          format: float
+          minimum: 50
+          maximum: 250
+        weight:
+          type: number
+          format: float
+          minimum: 10
+          maximum: 500
+        medicalConditions:
+          type: array
+          items:
+            type: string
+
+    PatientsListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Patient'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    # Video Processing Schemas
+    VideoUploadResponse:
+      type: object
+      properties:
+        videoId:
+          type: string
+        uploadUrl:
+          type: string
+        status:
+          type: string
+          enum: [uploaded, processing, completed, failed]
+        estimatedProcessingTime:
+          type: integer
+          description: Estimated processing time in seconds
+
+    ProcessingStatusResponse:
+      type: object
+      properties:
+        videoId:
+          type: string
+        status:
+          type: string
+          enum: [uploaded, processing, completed, failed]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        estimatedTimeRemaining:
+          type: integer
+          description: Estimated time remaining in seconds
+        error:
+          type: string
+          nullable: true
+
+    # ML Service Schemas
+    GaitAnalysisRequest:
+      type: object
+      required: [videoId]
+      properties:
+        videoId:
+          type: string
+        patientId:
+          type: string
+        analysisOptions:
+          type: object
+          properties:
+            includePathologicalDetection:
+              type: boolean
+              default: true
+            qualityThreshold:
+              type: number
+              format: float
+              minimum: 0
+              maximum: 1
+              default: 0.7
+
+    GaitAnalysisResponse:
+      type: object
+      properties:
+        analysisId:
+          type: string
+        result:
+          $ref: '#/components/schemas/GaitAnalysisResult'
+
+    AsyncProcessingResponse:
+      type: object
+      properties:
+        analysisId:
+          type: string
+        status:
+          type: string
+          enum: [processing]
+        estimatedCompletionTime:
+          type: string
+          format: date-time
+        statusUrl:
+          type: string
+
+    GaitAnalysisResult:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        patientId:
+          type: string
+          nullable: true
+        videoPath:
+          type: string
+        duration:
+          type: integer
+          description: Duration in seconds
+        frameCount:
+          type: integer
+        processingTime:
+          type: integer
+          description: Processing time in milliseconds
+        gaitParameters:
+          $ref: '#/components/schemas/GaitParameters'
+        qualityScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        recommendations:
+          type: array
+          items:
+            type: string
+        pathologicalResult:
+          $ref: '#/components/schemas/PathologicalDetectionResult'
+          nullable: true
+
+    GaitParameters:
+      type: object
+      properties:
+        cadence:
+          type: number
+          format: float
+          description: Steps per minute
+        stepLength:
+          type: number
+          format: float
+          description: Step length in meters
+        strideLength:
+          type: number
+          format: float
+          description: Stride length in meters
+        stepWidth:
+          type: number
+          format: float
+          description: Step width in meters
+        walkingSpeed:
+          type: number
+          format: float
+          description: Walking speed in m/s
+        stancePhase:
+          type: number
+          format: float
+          description: Stance phase as percentage (0-1)
+        swingPhase:
+          type: number
+          format: float
+          description: Swing phase as percentage (0-1)
+        doubleSupportTime:
+          type: number
+          format: float
+          description: Double support time as percentage (0-1)
+
+    PathologicalDetectionResult:
+      type: object
+      properties:
+        isPathological:
+          type: boolean
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+        riskScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        detectedPatterns:
+          type: array
+          items:
+            type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+
+    ModelsHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        models:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [healthy, degraded, unhealthy]
+              lastUpdated:
+                type: string
+                format: date-time
+              accuracy:
+                type: number
+                format: float
+
+    # Analysis Results Schemas
+    AnalysisHistoryResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/GaitAnalysisResult'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    # Monitoring Schemas
+    SystemMetrics:
+      type: object
+      properties:
+        uptime:
+          type: integer
+          description: System uptime in seconds
+        cpu:
+          type: object
+          properties:
+            usage:
+              type: number
+              format: float
+              description: CPU usage percentage
+        memory:
+          type: object
+          properties:
+            usage:
+              type: number
+              format: float
+              description: Memory usage percentage
+            total:
+              type: integer
+              description: Total memory in bytes
+        storage:
+          type: object
+          properties:
+            usage:
+              type: number
+              format: float
+              description: Storage usage percentage
+            total:
+              type: integer
+              description: Total storage in bytes
+        network:
+          type: object
+          properties:
+            inbound:
+              type: integer
+              description: Inbound traffic in bytes/sec
+            outbound:
+              type: integer
+              description: Outbound traffic in bytes/sec
+
+    UsageAnalytics:
+      type: object
+      properties:
+        totalAnalyses:
+          type: integer
+        totalUsers:
+          type: integer
+        averageProcessingTime:
+          type: number
+          format: float
+          description: Average processing time in seconds
+        successRate:
+          type: number
+          format: float
+          description: Success rate as percentage (0-1)
+        topFeatures:
+          type: array
+          items:
+            type: object
+            properties:
+              feature:
+                type: string
+              usage:
+                type: integer
+
+    # Common Schemas
+    PaginationMeta:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+        totalPages:
+          type: integer
+        totalItems:
+          type: integer
+        itemsPerPage:
+          type: integer
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+        requestId:
+          type: string
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Patients
+    description: Patient management operations
+  - name: Video Processing
+    description: Video upload and processing
+  - name: ML Service
+    description: Machine learning analysis operations
+  - name: Analysis Results
+    description: Analysis results management
+  - name: Monitoring
+    description: System monitoring and health checks
+  - name: Analytics
+    description: Usage analytics and reporting

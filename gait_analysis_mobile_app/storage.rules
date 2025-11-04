@@ -1,0 +1,128 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // User profile images
+    match /users/{userId}/profile/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == userId
+        && isImageFile(fileName)
+        && isValidFileSize(5); // 5MB max for profile images
+    }
+
+    // Patient videos for gait analysis
+    match /patients/{patientId}/videos/{fileName} {
+      allow read: if request.auth != null
+        && hasPermission('read_patient_data')
+        && belongsToSameOrganization(patientId);
+      allow write: if request.auth != null
+        && hasPermission('write_patient_data')
+        && belongsToSameOrganization(patientId)
+        && isVideoFile(fileName)
+        && isValidFileSize(500); // 500MB max for video files
+    }
+
+    // Analysis result files (PDFs, CSVs, etc.)
+    match /analyses/{analysisId}/results/{fileName} {
+      allow read: if request.auth != null
+        && (hasPermission('read_analysis_results')
+        || isOwnerOfAnalysis(analysisId));
+      allow write: if request.auth != null
+        && hasPermission('write_analysis_results')
+        && isValidResultFile(fileName)
+        && isValidFileSize(50); // 50MB max for result files
+    }
+
+    // ML model files - system access only
+    match /models/{modelVersion}/{fileName} {
+      allow read: if request.auth != null && hasRole('system');
+      allow write: if request.auth != null && hasRole('admin');
+    }
+
+    // Research data - anonymized data for research purposes
+    match /research/{studyId}/data/{fileName} {
+      allow read: if request.auth != null
+        && hasPermission('access_research_data')
+        && isApprovedResearcher();
+      allow write: if request.auth != null && hasRole('system');
+    }
+
+    // Temporary uploads - 24 hour expiration
+    match /temp/{userId}/{fileName} {
+      allow read, write: if request.auth != null
+        && request.auth.uid == userId
+        && isValidFileSize(100) // 100MB max for temp files
+        && isRecentUpload(); // Must be within 24 hours
+    }
+
+    // Backup files - admin only
+    match /backups/{backupId}/{fileName} {
+      allow read, write: if request.auth != null && hasRole('admin');
+    }
+
+    // Helper functions
+    function hasRole(role) {
+      return request.auth.token.role == role;
+    }
+
+    function hasPermission(permission) {
+      return permission in request.auth.token.permissions;
+    }
+
+    function belongsToSameOrganization(patientId) {
+      // This would need to be implemented based on your data structure
+      // For now, assuming organization check is done at application level
+      return true;
+    }
+
+    function isOwnerOfAnalysis(analysisId) {
+      // Check if the user created this analysis
+      return request.auth.token.analysisIds != null
+        && analysisId in request.auth.token.analysisIds;
+    }
+
+    function isApprovedResearcher() {
+      return hasRole('researcher') && request.auth.token.researchApproved == true;
+    }
+
+    function isImageFile(fileName) {
+      return fileName.matches('.*\\.(jpg|jpeg|png|gif|webp)$');
+    }
+
+    function isVideoFile(fileName) {
+      return fileName.matches('.*\\.(mp4|mov|avi|mkv|webm)$');
+    }
+
+    function isValidResultFile(fileName) {
+      return fileName.matches('.*\\.(pdf|csv|json|xlsx|docx)$');
+    }
+
+    function isValidFileSize(maxSizeMB) {
+      return request.resource.size < maxSizeMB * 1024 * 1024;
+    }
+
+    function isRecentUpload() {
+      return request.time < timestamp.date(2025, 1, 1) + duration.value(1, 'd');
+    }
+
+    // Content type validation
+    function isValidContentType() {
+      return request.resource.contentType.matches('image/.*')
+        || request.resource.contentType.matches('video/.*')
+        || request.resource.contentType.matches('application/pdf')
+        || request.resource.contentType.matches('text/csv')
+        || request.resource.contentType.matches('application/json');
+    }
+
+    // Prevent malicious file uploads
+    function isSafeFile() {
+      return !fileName.matches('.*\\.(exe|bat|cmd|com|pif|scr|vbs|js|jar|zip|rar)$');
+    }
+
+    // Rate limiting - prevent abuse
+    function notTooManyUploads() {
+      return request.time > resource.timeCreated + duration.value(1, 'm');
+    }
+  }
+}

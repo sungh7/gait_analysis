@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gait-analysis
+  labels:
+    name: gait-analysis
+    app: gait-analysis-pro
+    environment: production
