@@ -1,0 +1,67 @@
+# Gait Analysis Configuration
+# 2D Project - MediaPipe-based Gait Analysis
+
+processing:
+  fps: 30
+  subject_height: 1.70  # meters (default, can be overridden per subject)
+
+signal_processing:
+  # Joint-specific filtering parameters
+  knee:
+    butterworth_cutoff: 6  # Hz
+    butterworth_order: 2
+    sg_window: 9
+    sg_polyorder: 2
+  hip:
+    butterworth_cutoff: 8  # Hz
+    butterworth_order: 2
+    sg_window: 7
+    sg_polyorder: 2
+  ankle:
+    # Ankle requires more aggressive smoothing due to noise
+    median_kernel: 5
+    sg_window: 11
+    sg_polyorder: 2
+    gaussian_sigma: 1.0
+    # CRITICAL: Ankle uses geometric angles (0-180), not anatomical
+    # Do NOT enable velocity constraints - causes ROM destruction
+    enable_velocity_constraints: false
+    angle_range: [0, 180]  # Geometric range (not anatomical -30 to 50)
+
+kinematic_constraints:
+  knee:
+    angle_range: [0, 140]  # degrees (flexion)
+    max_velocity: 450  # deg/sec
+    max_acceleration: 2500  # deg/sec^2
+  hip:
+    angle_range: [-30, 120]  # degrees (extension to flexion)
+    max_velocity: 400  # deg/sec
+    max_acceleration: 2000  # deg/sec^2
+  ankle:
+    angle_range: [0, 180]  # Geometric range
+    # Velocity constraints disabled for ankle
+    enable_velocity_constraints: false
+
+quality_control:
+  min_visibility: 0.5  # MediaPipe confidence threshold
+  zscore_threshold: 3.0  # Outlier detection threshold
+  min_rom_preservation: 0.5  # Minimum ROM preservation after filtering
+  max_gap_frames: 10  # Maximum gap to interpolate
+
+gait_cycle_detection:
+  # AT-RTM (Auto-Template Resampled Template Matching) parameters
+  template_cycles: 3  # Number of cycles for template creation
+  dtw_radius: 10  # FastDTW radius parameter
+  min_cycle_frames: 20  # Minimum frames per cycle
+  max_cycle_frames: 100  # Maximum frames per cycle
+
+paths:
+  data_dir: /data/gait/data
+  output_dir: ./results
+  logs_dir: ./logs
+  batch_results_dir: ./batch_results
+
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  file_logging: true
+  console_logging: true

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs ls:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)",
+      "Bash(python:*)",
+      "Bash(ffprobe:*)",
+      "Bash(chmod:*)",
+      "Bash(bash:*)",
+      "Bash(tee:*)",
+      "Bash(xargs:*)",
+      "Bash(du:*)",
+      "Bash(tree:*)",
+      "Bash(grep:*)"
+    ]
+  }
+}
