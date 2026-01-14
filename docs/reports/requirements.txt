@@ -1,0 +1,10 @@
+streamlit
+opencv-python
+mediapipe
+pandas
+numpy
+scikit-learn
+imbalanced-learn
+joblib
+matplotlib
+plotly

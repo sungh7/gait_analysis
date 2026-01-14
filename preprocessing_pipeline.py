@@ -48,12 +48,18 @@ class PreprocessingPipeline:
         smoothing_polyorder: int = 3,
         target_fps: float = 30.0,
         critical_landmarks: Optional[Sequence[str]] = None,
+        use_butterworth: bool = False,
+        butterworth_cutoff: Union[float, Dict[str, float]] = 6.0,
+        butterworth_order: int = 4,
     ) -> None:
         self.visibility_threshold = visibility_threshold
         self.zscore_threshold = zscore_threshold
         self.smoothing_window = smoothing_window
         self.smoothing_polyorder = smoothing_polyorder
         self.target_fps = target_fps
+        self.use_butterworth = use_butterworth
+        self.butterworth_cutoff = butterworth_cutoff
+        self.butterworth_order = butterworth_order
         self.critical_landmarks = (
             list(critical_landmarks)
             if critical_landmarks is not None
@@ -183,41 +189,98 @@ class PreprocessingPipeline:
                 )
             )
 
-        # 5. Savitzky-Golay smoothing
-        window_length = self._valid_window_length(len(df_processed))
+        # 5. Smoothing (Savitzky-Golay or Butterworth)
+        # Priority: Butterworth if cutoff frequency is set, otherwise Savitzky-Golay
         smoothed_cols = 0
-        if window_length is not None:
-            for col in coordinate_cols:
+        
+        if self.use_butterworth:
+             for col in coordinate_cols:
                 series = df_processed[col].astype(float)
                 if series.isna().sum() >= len(series) - 2:
                     continue
+                
+                # Determine cutoff for this column
+                cutoff = self.butterworth_cutoff
+                if isinstance(cutoff, dict):
+                    # Default to 6.0 if not specified
+                    col_cutoff = 6.0
+                    for key, val in cutoff.items():
+                        if key in col:
+                            col_cutoff = val
+                            break
+                    cutoff = col_cutoff
+                
+                if cutoff <= 0:
+                    continue
 
+                # Interpolate for filtering
                 filled = series.interpolate(method="linear", limit_direction="both", limit_area=None)
                 if filled.isna().sum() > 0:
                     continue
 
-                smoothed = savgol_filter(
-                    filled.values,
-                    window_length=window_length,
-                    polyorder=min(self.smoothing_polyorder, window_length - 1),
-                    mode="interp",
-                )
+                smoothed = self._apply_butterworth_filter(filled.values, effective_fps, cutoff)
                 df_processed[col] = smoothed
                 smoothed_cols += 1
-
-        if smoothed_cols > 0:
-            log.append(
-                ProcessingLogEntry(
-                    step="savgol_smoothing",
-                    details={
-                        "window_length": window_length,
-                        "polyorder": min(self.smoothing_polyorder, window_length - 1),
-                        "columns_smoothed": smoothed_cols,
-                    },
+                
+             if smoothed_cols > 0:
+                log.append(
+                    ProcessingLogEntry(
+                        step="butterworth_smoothing",
+                        details={
+                            "cutoff_hz": str(self.butterworth_cutoff),
+                            "order": self.butterworth_order,
+                            "columns_smoothed": smoothed_cols,
+                        },
+                    )
                 )
-            )
+
+        elif self.smoothing_window > 0:
+            window_length = self._valid_window_length(len(df_processed))
+            if window_length is not None:
+                for col in coordinate_cols:
+                    series = df_processed[col].astype(float)
+                    if series.isna().sum() >= len(series) - 2:
+                        continue
+
+                    filled = series.interpolate(method="linear", limit_direction="both", limit_area=None)
+                    if filled.isna().sum() > 0:
+                        continue
+
+                    smoothed = savgol_filter(
+                        filled.values,
+                        window_length=window_length,
+                        polyorder=min(self.smoothing_polyorder, window_length - 1),
+                        mode="interp",
+                    )
+                    df_processed[col] = smoothed
+                    smoothed_cols += 1
+
+            if smoothed_cols > 0:
+                log.append(
+                    ProcessingLogEntry(
+                        step="savgol_smoothing",
+                        details={
+                            "window_length": window_length,
+                            "polyorder": min(self.smoothing_polyorder, window_length - 1),
+                            "columns_smoothed": smoothed_cols,
+                        },
+                    )
+                )
 
         return PreprocessingResult(dataframe=df_processed, fps=effective_fps, log=log)
+
+    def _apply_butterworth_filter(self, data: np.ndarray, fps: float, cutoff: float) -> np.ndarray:
+        from scipy.signal import butter, filtfilt
+        
+        nyquist = 0.5 * fps
+        normal_cutoff = cutoff / nyquist
+        
+        # Safety check for cutoff
+        if normal_cutoff >= 1.0:
+            normal_cutoff = 0.99
+            
+        b, a = butter(self.butterworth_order, normal_cutoff, btype='low', analog=False)
+        return filtfilt(b, a, data)
 
     def _resample_to_target_fps(self, df: pd.DataFrame, original_fps: float) -> Tuple[pd.DataFrame, float]:
         time = df["frame"].values.astype(float) / original_fps

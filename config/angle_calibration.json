@@ -1,0 +1,24 @@
+{
+  "offsets": {
+    "hip_flexion_extension": 76.08724065303748,
+    "knee_flexion_extension": 50.362597945682886,
+    "ankle_dorsi_plantarflexion": -15.181074732638209,
+    "hip_abduction_adduction_left": 0.0,
+    "hip_abduction_adduction_right": 0.0,
+    "pelvis_obliquity": 0.0,
+    "trunk_sway_mediolateral": 0.0
+  },
+  "phase_shifts": {
+    "hip_flexion_extension": 35,
+    "knee_flexion_extension": 56,
+    "ankle_dorsi_plantarflexion": 46,
+    "hip_abduction_adduction_left": 0,
+    "hip_abduction_adduction_right": 0,
+    "pelvis_obliquity": 0,
+    "trunk_sway_mediolateral": 0
+  },
+  "dynamic_shift_search": {
+    "enabled": true,
+    "window": 10
+  }
+}

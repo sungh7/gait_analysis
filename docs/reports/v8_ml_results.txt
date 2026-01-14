@@ -1,0 +1,84 @@
+================================================================================
+V8 ML-Enhanced Gait Detector
+================================================================================
+
+Loaded 296 patterns
+Valid patterns: 296
+  Normal: 142
+  Pathological: 154
+
+Training ML model...
+
+Feature matrix shape: (296, 10)
+Class distribution: Normal=142, Pathological=154
+
+5-Fold Cross-Validation:
+  Accuracy: 0.888 (+/- 0.030)
+  Sensitivity: 0.961 (+/- 0.038)
+
+Feature Importance (Logistic Regression Coefficients):
+------------------------------------------------------------
+ 1. gait_irregularity_3d          : -1.6286  ↓ Normal
+ 2. cadence_3d                    : +1.1689  ↑ Path.
+ 3. jerkiness_3d                  : -1.0202  ↓ Normal
+ 4. step_height_variability       : -0.9420  ↓ Normal
+ 5. cycle_duration_3d             : +0.9044  ↑ Path.
+ 6. trunk_sway                    : +0.6426  ↑ Path.
+ 7. path_length_3d                : -0.5562  ↓ Normal
+ 8. velocity_3d                   : -0.5236  ↓ Normal
+ 9. stride_length_3d              : -0.2250  ↓ Normal
+10. step_width_3d                 : +0.0980  ↑ Path.
+
+================================================================================
+Overall Performance
+================================================================================
+
+              precision    recall  f1-score   support
+
+      Normal      0.951     0.824     0.883       142
+Pathological      0.855     0.961     0.905       154
+
+    accuracy                          0.895       296
+   macro avg      0.903     0.892     0.894       296
+weighted avg      0.901     0.895     0.895       296
+
+Confusion Matrix:
+  True Negatives (Normal correctly classified):  117
+  False Positives (Normal misclassified):        25
+  False Negatives (Pathological missed):         6
+  True Positives (Pathological detected):        148
+
+Accuracy:    0.895 (89.5%)
+Sensitivity: 0.961 (96.1%)
+Specificity: 0.824 (82.4%)
+Precision:   0.855 (85.5%)
+ROC AUC:     0.922
+
+================================================================================
+Performance by Pathology Type
+================================================================================
+
+abnormal            :  80 cases,  79/ 80 detected ( 98.8% sensitivity)
+antalgic            :   9 cases,   9/  9 detected (100.0% sensitivity)
+cerebral palsy      :  24 cases,  24/ 24 detected (100.0% sensitivity)
+inebriated          :   2 cases,   0/  2 detected (  0.0% sensitivity)
+myopathic           :  20 cases,  18/ 20 detected ( 90.0% sensitivity)
+normal              : 142 cases,  82.4% specificity (25 false positives)
+parkinsons          :   6 cases,   6/  6 detected (100.0% sensitivity)
+pregnant            :   2 cases,   2/  2 detected (100.0% sensitivity)
+stroke              :  11 cases,  10/ 11 detected ( 90.9% sensitivity)
+
+Clinical Pathology Sensitivity: 0.919 (91.9%) on 37 cases
+
+Model saved to v8_ml_model.json
+================================================================================
+Comparison with V7 Baseline
+================================================================================
+
+Metric               V7 (MAD-Z)      V8 (ML)         Improvement    
+----------------------------------------------------------------------
+Accuracy             0.682           0.895           +21.3%
+Sensitivity          0.922           0.961           +3.9%
+
+✅ V8 ML-Enhanced model training complete!
+

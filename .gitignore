@@ -5,6 +5,12 @@ __pycache__/
 .ipynb_checkpoints/
 .vscode/
 *.log
+nohup.out
+
+# Jupyter notebooks (exclude from git)
+*.ipynb
+!docs/**/*.ipynb
+!tutorials/**/*.ipynb
 
 # Large binary artifacts
 *.mp4
@@ -16,36 +22,99 @@ __pycache__/
 *.png
 *.mat
 *.zip
+*.deb
+*.deb.*
 
 # Environment and temp directories
 .conda/
-temp/
-test_images/
-jupyter-notify/
+.pytest_cache/
+
+# Archive directory (legacy files, not tracked)
+archive/
 
 # Generated data outputs
 data/
-processed/
-processed_new/
-results/
-validation_results/
-batch_results/
-mp_result/
-realtime_gait_system/
-ground_truth_formatted/
-visualization_results/
-organized_project/
-gavd_real_models_*/
+output/
+models/
+gavd_models/
+validation/
+validation_results*/
 
 # Keep organized structure - do not ignore
 !core/
+!scripts/
 !experiments/
 !docs/
+!tests/
+!functions/
+!config/
 
-# Experimental outputs
+# Experimental outputs and intermediate results
 experiments/*.json
 experiments/*.csv
 experiments/*.txt
 experiments/*.log
+*_results.json
+*_results.csv
+*_output.txt
+*_log.txt
+*_report.txt
+*_summary.txt
+*_report.json
+*_summary.csv
+*_analysis_results.json
+*_comparison_*.csv
+*_validation_*.csv
+*_metrics*.json
+*_parameters*.json
+*_statistics.csv
+*_features.csv
+*_cycles*.json
+*_waveforms.json
+*_data.csv
+*_patterns*.json
 
+# Configuration and calibration files (generated)
+calibration_parameters*.json
+angle_conversion_params.json
+normal_gait_reference*.json
+*_reference.json
+detector_reference*.json
+
+# Large generated JSON files
 gavd_patterns_with_v7_features.json
+mediapipe_cycles_*.json
+gavd_*_patterns*.json
+
+# Model files (generated)
+v8_ml_model.json
+v9_multiview_model.json
+*_model.json
+
+# Markdown files (all docs now in docs/)
+!README.md
+!docs/**/*.md
+!core/**/*.md
+!scripts/**/*.md
+
+# CSV data files (intermediate)
+*pose_landmarks.csv
+*_3d_pose*.csv
+*_edited.csv
+*_gait_*.csv
+*_test_*.csv
+hos_nor_avg.csv
+left_heel.csv
+body_measurements.csv
+workshop*.csv
+
+# Excel files
+*.xlsx
+!docs/**/*.xlsx
+
+# Workspace and IDE files
+*.code-workspace
+.research_log_summary.txt
+
+# Debian packages
+cuda-keyring_*.deb*
