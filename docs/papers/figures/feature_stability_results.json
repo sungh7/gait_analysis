@@ -1,0 +1,178 @@
+{
+  "features": [
+    {
+      "name": "gait_irregularity_3d",
+      "rank": 1,
+      "mean_abs_coef": 1.5753,
+      "mean_coef": -1.5753,
+      "std_coef": 0.158,
+      "rank_min": 1,
+      "rank_max": 1,
+      "stability": "High"
+    },
+    {
+      "name": "cadence_3d",
+      "rank": 2,
+      "mean_abs_coef": 1.1057,
+      "mean_coef": 1.1057,
+      "std_coef": 0.125,
+      "rank_min": 2,
+      "rank_max": 5,
+      "stability": "Moderate"
+    },
+    {
+      "name": "jerkiness_3d",
+      "rank": 3,
+      "mean_abs_coef": 0.99,
+      "mean_coef": -0.99,
+      "std_coef": 0.1054,
+      "rank_min": 2,
+      "rank_max": 4,
+      "stability": "High"
+    },
+    {
+      "name": "step_height_variability",
+      "rank": 4,
+      "mean_abs_coef": 0.9676,
+      "mean_coef": -0.9676,
+      "std_coef": 0.2418,
+      "rank_min": 2,
+      "rank_max": 5,
+      "stability": "Moderate"
+    },
+    {
+      "name": "cycle_duration_3d",
+      "rank": 5,
+      "mean_abs_coef": 0.8525,
+      "mean_coef": 0.8525,
+      "std_coef": 0.0812,
+      "rank_min": 3,
+      "rank_max": 5,
+      "stability": "High"
+    },
+    {
+      "name": "trunk_sway",
+      "rank": 6,
+      "mean_abs_coef": 0.6422,
+      "mean_coef": 0.6422,
+      "std_coef": 0.1506,
+      "rank_min": 6,
+      "rank_max": 8,
+      "stability": "High"
+    },
+    {
+      "name": "path_length_3d",
+      "rank": 7,
+      "mean_abs_coef": 0.5445,
+      "mean_coef": -0.5445,
+      "std_coef": 0.0496,
+      "rank_min": 6,
+      "rank_max": 7,
+      "stability": "High"
+    },
+    {
+      "name": "velocity_3d",
+      "rank": 8,
+      "mean_abs_coef": 0.5161,
+      "mean_coef": -0.5161,
+      "std_coef": 0.0538,
+      "rank_min": 7,
+      "rank_max": 8,
+      "stability": "High"
+    },
+    {
+      "name": "stride_length_3d",
+      "rank": 9,
+      "mean_abs_coef": 0.2219,
+      "mean_coef": -0.2219,
+      "std_coef": 0.1345,
+      "rank_min": 9,
+      "rank_max": 10,
+      "stability": "Low"
+    },
+    {
+      "name": "step_width_3d",
+      "rank": 10,
+      "mean_abs_coef": 0.1069,
+      "mean_coef": 0.1069,
+      "std_coef": 0.037,
+      "rank_min": 9,
+      "rank_max": 10,
+      "stability": "Moderate"
+    }
+  ],
+  "coef_matrix": [
+    [
+      1.119419489511954,
+      -0.7506983280730397,
+      -1.606304814985512,
+      -0.5463308236226889,
+      -0.9593084775785912,
+      0.756531132132585,
+      -0.16773267765030653,
+      0.4234536173085812,
+      -0.5784825503117234,
+      0.0709346640242628
+    ],
+    [
+      1.0331755812706878,
+      -0.7706440429645156,
+      -1.3220724543838909,
+      -0.5228501718708283,
+      -0.8041197899162098,
+      0.8876717531984701,
+      -0.4495312728116313,
+      0.6918041318818645,
+      -0.5521632316173443,
+      0.07764857999270429
+    ],
+    [
+      0.9626220681247961,
+      -1.3105409489972928,
+      -1.81400100695356,
+      -0.48673886394296345,
+      -1.0383175834415401,
+      0.971259908346549,
+      -0.034585995762261894,
+      0.8306335620957654,
+      -0.500819797456699,
+      0.1678116926808769
+    ],
+    [
+      1.080633605166073,
+      -0.7952717002501634,
+      -1.603866963393459,
+      -0.4329078057571312,
+      -1.1162848079215832,
+      0.7655249372431292,
+      -0.24523319193928977,
+      0.5153747356928051,
+      -0.47773640746551777,
+      0.1312178290220122
+    ],
+    [
+      1.3327054007950396,
+      -1.2107932218618465,
+      -1.5304939186721764,
+      -0.5917663195749224,
+      -1.031720572030987,
+      0.881372205754278,
+      -0.21225626085190805,
+      0.7495674277134817,
+      -0.6132669291305387,
+      0.08692710002532791
+    ]
+  ],
+  "summary": {
+    "high_stability_count": 6,
+    "moderate_stability_count": 3,
+    "low_stability_count": 1,
+    "top3_features": [
+      "gait_irregularity_3d",
+      "cadence_3d",
+      "jerkiness_3d"
+    ],
+    "mean_cv_accuracy": 88.8,
+    "std_cv_accuracy": 3.0
+  }
+}

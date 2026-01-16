@@ -1,0 +1,77 @@
+{
+  "feature_ranking": [
+    "gait_irregularity_3d",
+    "cadence_3d",
+    "jerkiness_3d",
+    "step_height_variability",
+    "cycle_duration_3d",
+    "trunk_sway",
+    "path_length_3d",
+    "velocity_3d",
+    "stride_length_3d",
+    "step_width_3d"
+  ],
+  "ablation_results": [
+    {
+      "k": 3,
+      "features": [
+        "gait_irregularity_3d",
+        "cadence_3d",
+        "jerkiness_3d"
+      ],
+      "accuracy": 89.2,
+      "sensitivity": 95.5,
+      "specificity": 82.4,
+      "auc": 0.897
+    },
+    {
+      "k": 5,
+      "features": [
+        "gait_irregularity_3d",
+        "cadence_3d",
+        "jerkiness_3d",
+        "step_height_variability",
+        "cycle_duration_3d"
+      ],
+      "accuracy": 89.2,
+      "sensitivity": 96.8,
+      "specificity": 81.0,
+      "auc": 0.91
+    },
+    {
+      "k": 7,
+      "features": [
+        "gait_irregularity_3d",
+        "cadence_3d",
+        "jerkiness_3d",
+        "step_height_variability",
+        "cycle_duration_3d",
+        "trunk_sway",
+        "path_length_3d"
+      ],
+      "accuracy": 89.5,
+      "sensitivity": 96.1,
+      "specificity": 82.4,
+      "auc": 0.914
+    },
+    {
+      "k": 10,
+      "features": [
+        "gait_irregularity_3d",
+        "cadence_3d",
+        "jerkiness_3d",
+        "step_height_variability",
+        "cycle_duration_3d",
+        "trunk_sway",
+        "path_length_3d",
+        "velocity_3d",
+        "stride_length_3d",
+        "step_width_3d"
+      ],
+      "accuracy": 88.9,
+      "sensitivity": 96.1,
+      "specificity": 81.0,
+      "auc": 0.912
+    }
+  ]
+}

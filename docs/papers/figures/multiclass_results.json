@@ -1,0 +1,78 @@
+{
+  "classes": [
+    "Myopathic",
+    "Neurological",
+    "Normal",
+    "Other_Abnormal"
+  ],
+  "metrics": [
+    {
+      "class": "Myopathic",
+      "n": 20,
+      "sensitivity": 55.0,
+      "specificity": 92.3,
+      "ppv": 34.4,
+      "npv": 96.5,
+      "auc": 0.912
+    },
+    {
+      "class": "Neurological",
+      "n": 41,
+      "sensitivity": 53.7,
+      "specificity": 91.6,
+      "ppv": 51.2,
+      "npv": 92.4,
+      "auc": 0.89
+    },
+    {
+      "class": "Normal",
+      "n": 142,
+      "sensitivity": 81.7,
+      "specificity": 97.3,
+      "ppv": 96.7,
+      "npv": 84.9,
+      "auc": 0.93
+    },
+    {
+      "class": "Other_Abnormal",
+      "n": 89,
+      "sensitivity": 67.4,
+      "specificity": 81.8,
+      "ppv": 61.9,
+      "npv": 85.1,
+      "auc": 0.928
+    }
+  ],
+  "macro_avg": {
+    "sensitivity": 64.4,
+    "precision": 61.0,
+    "f1": 0.619,
+    "auc": 0.915
+  },
+  "confusion_matrix": [
+    [
+      11,
+      0,
+      2,
+      7
+    ],
+    [
+      2,
+      22,
+      1,
+      16
+    ],
+    [
+      2,
+      10,
+      116,
+      14
+    ],
+    [
+      17,
+      11,
+      1,
+      60
+    ]
+  ]
+}
