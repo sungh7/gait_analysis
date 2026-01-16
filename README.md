@@ -1,17 +1,21 @@
 # MediaPipe Gait Analysis System
 
-**Version 8.0 - ML-Enhanced with Clinical-Grade Accuracy**
+**Version 8.1 - Corrected Methodology with Validated Performance**
 
-A comprehensive markerless gait analysis system using MediaPipe 3D pose estimation with machine learning for automated pathological gait detection. This system provides accurate, accessible, and clinically-validated gait analysis achieving **89.5% accuracy** and **96.1% sensitivity** for pathological gait detection.
+A comprehensive markerless gait analysis system using MediaPipe 3D pose estimation with machine learning for automated pathological gait detection. This system provides accurate, accessible, and clinically-validated gait analysis achieving **88.8% accuracy** and **96.1% sensitivity** for pathological gait detection.
 
-## 🎯 Key Features (Version 8.0)
+> ⚠️ **v8.1 Update**: Corrected data leakage in cross-validation using sklearn Pipeline. Results are slightly lower but represent honest real-world performance estimates.
 
-- **ML-Enhanced Detection**: 89.5% accuracy, 96.1% sensitivity (21.3% improvement over baseline)
+## 🎯 Key Features (Version 8.1)
+
+- **ML-Enhanced Detection**: 88.8% accuracy [86.2%, 91.5%], 96.1% sensitivity [92.8%, 99.4%]
+- **Corrected Methodology**: sklearn Pipeline prevents data leakage in cross-validation
+- **Bootstrap Confidence Intervals**: 1000-iteration bootstrap for uncertainty quantification
 - **Clinical-Grade Performance**: Perfect detection (100%) for Parkinson's, cerebral palsy, antalgic gait
 - **Pure 3D Biomechanics**: 10 interpretable features from MediaPipe world coordinates
-- **Real-time Processing**: <50ms inference suitable for clinical workflow
-- **iOS Native Support**: Real-time mobile gait analysis on iPhone/iPad
 - **Multi-pathology Validation**: 8 pathology types, 296 gait patterns (GAVD dataset)
+- **Ablation Study**: Top 3 features achieve 89.2% accuracy (parsimonious model)
+- **Subject-level Simulation**: Estimated generalization performance with clustering
 
 ## 🏗️ System Architecture
 
@@ -51,14 +55,24 @@ MediaPipe 3D Pose → V7 Feature Extraction → V8 ML Classifier → Clinical Re
 
 ## 📊 Performance Metrics (GAVD Dataset)
 
-### V8 ML-Enhanced Results
+### V8.1 ML-Enhanced Results (Corrected Methodology)
 
-| Metric | V7 Baseline | V8 ML-Enhanced | Improvement |
-|--------|-------------|----------------|-------------|
-| **Overall Accuracy** | 68.2% | **89.5%** | +21.3% |
-| **Overall Sensitivity** | 92.2% | **96.1%** | +3.9% |
-| **Overall Specificity** | 43.0% | **82.4%** | +39.4% |
-| **Cross-Validation** | N/A | 88.8% ± 3.0% | Robust |
+| Metric | Value | 95% CI | Notes |
+|--------|-------|--------|-------|
+| **Accuracy** | 88.8% | [86.2%, 91.5%] | 5-fold stratified CV |
+| **Sensitivity** | 96.1% | [92.8%, 99.4%] | High pathology detection |
+| **Specificity** | 81.0% | [75.7%, 86.3%] | Room for improvement |
+| **AUC-ROC** | 0.91 | [0.89, 0.94] | Good discrimination |
+| **F1-Score** | 0.90 | [0.88, 0.92] | Balanced performance |
+
+### Methodological Correction (v8.0 → v8.1)
+
+| Metric | Before (v8.0) | After (v8.1) | Difference |
+|--------|---------------|--------------|------------|
+| Accuracy | 89.5% | 88.8% | -0.7% |
+| Specificity | 82.4% | 81.0% | -1.4% |
+
+> The v8.1 results use sklearn Pipeline to prevent data leakage, representing more honest estimates.
 
 ### Perfect Detection (100% Sensitivity)
 
@@ -191,17 +205,33 @@ Top discriminative features for pathology detection:
 
 ## 🔬 Validation Studies
 
-### GAVD Dataset Validation
+### GAVD Dataset Validation (v8.1)
 - **Dataset**: 296 gait patterns (142 normal, 154 pathological)
 - **Pathology types**: 8 categories including Parkinson's, stroke, cerebral palsy
-- **Views**: Front, left side, right side
-- **Result**: 89.5% accuracy, 96.1% sensitivity
+- **Validation**: Stratified 5-fold CV with sklearn Pipeline (no data leakage)
+- **Result**: 88.8% accuracy, 96.1% sensitivity, 81.0% specificity
+
+### Extended Analyses
+- **Multi-class Classification**: 71.6% accuracy across 4 pathology groups (AUC 0.89-0.93)
+- **Ablation Study**: Top 3 features (Gait Irregularity, Cadence, Jerkiness) achieve 89.2% accuracy
+- **Feature Stability**: 6/10 features show high stability across CV folds
+- **Learning Curve**: Performance plateau reached; additional data unlikely to help
+
+### Subject-level Simulation
+Since GAVD lacks subject identifiers, we simulated subject-level validation using clustering:
+
+| Validation Type | LR Accuracy | LR Sensitivity | LR Specificity |
+|-----------------|-------------|----------------|----------------|
+| Pattern-level (baseline) | 88.9% | 96.1% | 81.0% |
+| Subject-level (simulated) | 88.5% | 96.1% | 80.3% |
+
+> Logistic Regression shows robust generalization; Random Forest showed significant overfitting in subject-level simulation.
 
 ### Clinical Ground Truth Validation
-- **Cohort**: 21 healthy subjects
-- **Gold standard**: Hospital instrumented walkway system
-- **ICC Analysis**: Ongoing validation of temporal-spatial parameters
-- **Documentation**: See [RESEARCH_LOG.md](RESEARCH_LOG.md) and [docs/RESEARCH_PAPER_DRAFT.md](docs/RESEARCH_PAPER_DRAFT.md)
+- **Cohort**: 28 healthy subjects (Vicon validation)
+- **Waveform Correlation**: r = 0.75-0.86 for sagittal kinematics
+- **Spatiotemporal ICC**: 0.71-0.89 (moderate-excellent agreement)
+- **Documentation**: See [docs/papers/RESEARCH_PAPER.md](docs/papers/RESEARCH_PAPER.md)
 
 ## 🏥 Clinical Applications
 
@@ -294,6 +324,30 @@ clf = LogisticRegression(
 }
 ```
 
+## 🔧 Methodological Improvements (v8.1)
+
+### Data Leakage Prevention
+```python
+# BEFORE (v8.0 - data leakage)
+X_scaled = scaler.fit_transform(X)  # Fits on ALL data
+cv_scores = cross_val_score(clf, X_scaled, y, cv=5)
+
+# AFTER (v8.1 - corrected)
+pipeline = Pipeline([
+    ('scaler', StandardScaler()),  # Fit only on training fold
+    ('clf', LogisticRegression(class_weight='balanced'))
+])
+cv_scores = cross_val_score(pipeline, X, y, cv=5)
+```
+
+### Analysis Scripts
+- `scripts/analysis/multiclass_pathology_analysis.py` - 4-class classification
+- `scripts/analysis/ablation_study.py` - Feature subset analysis
+- `scripts/analysis/feature_stability_analysis.py` - Coefficient stability
+- `scripts/analysis/learning_curve_analysis.py` - Sample size vs performance
+- `scripts/analysis/subject_level_simulation.py` - Simulated LOGO-CV
+- `scripts/analysis/improve_specificity.py` - Ensemble model comparison
+
 ## 🚨 Limitations and Considerations
 
 ### Technical Limitations
@@ -308,6 +362,14 @@ clf = LogisticRegression(
 - **Population bias**: Trained primarily on adult gait patterns
 - **Pathology coverage**: Limited to 8 validated pathology types
 - **Complement not replacement**: Use alongside clinical examination
+- **Specificity limitation**: 81% specificity → 19% false positive rate
+- **PPV in low prevalence**: At 10% prevalence, PPV = 36% (many false alarms)
+
+### Methodological Limitations
+- **Pattern-level validation**: Subject identifiers unavailable in GAVD dataset
+- **YouTube data source**: Variable video quality and conditions
+- **Single camera view**: Sagittal plane only; no frontal/transverse validation
+- **Depth ambiguity**: Monocular 3D estimation has inherent depth errors
 
 ### Ethical Considerations
 - Patient privacy and video data handling
